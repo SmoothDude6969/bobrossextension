@@ -1,30 +1,36 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rainbow Glowing Sphere</title>
-    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
-    <style>
-        body { 
+(function() {
+    // Create container for the scene
+    const container = document.createElement('div');
+    container.id = 'rainbow-container';
+    document.body.appendChild(container);
+
+    // Inject Google Fonts for pixelated text
+    const fontLink = document.createElement('link');
+    fontLink.href = 'https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap';
+    fontLink.rel = 'stylesheet';
+    document.head.appendChild(fontLink);
+
+    // Inject styles
+    const style = document.createElement('style');
+    style.textContent = `
+        #rainbow-container { 
             margin: 0; 
             background: black; 
-            overflow: hidden;
-            position: absolute;
+            position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            z-index: 2147483640; /* Near max z-index for background */
+            z-index: 2147483640;
         }
-        canvas { 
+        #rainbow-canvas { 
             display: block; 
             position: absolute;
             top: 0;
             left: 0;
-            z-index: 2147483641; /* One above body */
+            z-index: 2147483641;
         }
-        #title {
+        #rainbow-title {
             position: absolute;
             top: 20px;
             left: 50%;
@@ -33,13 +39,13 @@
             font-family: 'Press Start 2P', cursive;
             font-size: 1.5em;
             text-align: center;
-            z-index: 2147483642; /* Highest z-index for text */
+            z-index: 2147483642;
             text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
             cursor: pointer;
             animation: wobble 2s ease-in-out infinite;
             transition: transform 0.3s ease;
         }
-        #title:hover {
+        #rainbow-title:hover {
             transform: translateX(-50%) scale(1.2);
         }
         @keyframes wobble {
@@ -51,25 +57,33 @@
         .hidden {
             display: none !important;
         }
-    </style>
-</head>
-<body>
-    <div id="title">Rainbow Client</div>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
-    <script>
+    `;
+    document.head.appendChild(style);
+
+    // Inject title text
+    const title = document.createElement('div');
+    title.id = 'rainbow-title';
+    title.textContent = 'Rainbow Client';
+    container.appendChild(title);
+
+    // Inject Three.js script
+    const threeScript = document.createElement('script');
+    threeScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js';
+    threeScript.onload = function() {
         // Scene setup
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: false });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(1);
-        document.body.appendChild(renderer.domElement);
+        renderer.domElement.id = 'rainbow-canvas';
+        container.appendChild(renderer.domElement);
 
         // Check WebGL availability
         if (!renderer.getContext()) {
             console.error("WebGL is not supported or failed to initialize.");
-            document.body.innerHTML += '<p style="color: white; text-align: center;">WebGL is not supported in your browser.</p>';
-            throw new Error("WebGL not supported");
+            container.innerHTML += '<p style="color: white; text-align: center;">WebGL is not supported in your browser.</p>';
+            return;
         }
 
         // Create sphere geometry
@@ -92,13 +106,11 @@
             uniform float time;
             uniform float glowIntensity;
             void main() {
-                // Rainbow color based on position and time
                 vec3 color = vec3(
                     sin(vPosition.x + time) * 0.5 + 0.5,
                     sin(vPosition.y + time + 2.0) * 0.5 + 0.5,
                     sin(vPosition.z + time + 4.0) * 0.5 + 0.5
                 );
-                // Quantize colors for pixelated effect
                 float pixelSize = 0.1;
                 color = floor(color / pixelSize) * pixelSize;
                 float intensity = pow(0.6 - dot(vNormal, normalize(-vPosition)), 2.0) * glowIntensity;
@@ -145,11 +157,10 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
-        // Click event to hide everything, including background
-        const title = document.getElementById('title');
+        // Click event to hide everything
         title.addEventListener('click', () => {
-            document.body.classList.add('hidden');
+            container.classList.add('hidden');
         });
-    </script>
-</body>
-</html>
+    };
+    document.head.appendChild(threeScript);
+})();
