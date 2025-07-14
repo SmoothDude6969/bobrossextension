@@ -1,11 +1,22 @@
 {
-  "manifest_version": 3,
-  "name": "BobRossRocks",
-  "version": "1.0.0",
-  "content_scripts": [
-    {
-      "matches": ["https://it.crazygames.com/gioco/miniblox*"],
-      "js": ["Content.js"]
-    }
-  ]
+    "manifest_version": 3,
+    "name": "Miniblox Rainbow Sphere",
+    "version": "1.0",
+    "description": "Injects a pixelated rainbow sphere and text into Miniblox.io",
+    "content_scripts": [
+        {
+            "matches": ["https://miniblox.io/*"],
+            "js": ["content.js"],
+            "run_at": "document_end"
+        }
+    ],
+    "permissions": [
+        "activeTab"
+    ],
+    "web_accessible_resources": [
+        {
+            "resources": ["https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"],
+            "matches": ["https://miniblox.io/*"]
+        }
+    ]
 }
