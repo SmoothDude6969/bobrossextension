@@ -6,16 +6,13 @@
         setTimeout(() => {
             console.log("Starting scene setup");
 
-            // Create shadow DOM to isolate the scene
-            const host = document.createElement('div');
-            host.id = 'rainbow-host';
-            document.body.appendChild(host);
-            const shadow = host.attachShadow({ mode: 'open' });
-            console.log("Shadow DOM created: #rainbow-host");
-
-            // Inject HTML with container, styles, and scripts
+            // Create container (no shadow DOM to simplify)
             const container = document.createElement('div');
             container.id = 'rainbow-container';
+            document.body.appendChild(container);
+            console.log("Container created: #rainbow-container");
+
+            // Inject HTML with styles and scripts
             container.innerHTML = `
                 <style>
                     #rainbow-container { 
@@ -41,7 +38,7 @@
                         left: 50%;
                         transform: translateX(-50%);
                         color: white;
-                        font-family: 'Press Start 2P', cursive;
+                        font-family: 'Press Start 2P', cursive, monospace;
                         font-size: 1.5em;
                         text-align: center;
                         z-index: 2147483642;
@@ -63,12 +60,21 @@
                         display: none !important;
                     }
                 </style>
-                <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+                <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" id="font-link">
                 <div id="rainbow-title">Rainbow Client</div>
                 <script src="https://unpkg.com/three@0.134.0/build/three.min.js"></script>
             `;
-            shadow.appendChild(container);
-            console.log("Container and styles injected into shadow DOM");
+            console.log("Container HTML and styles injected");
+
+            // Monitor font loading
+            const fontLink = container.querySelector('#font-link');
+            fontLink.onload = () => console.log("Font loaded successfully");
+            fontLink.onerror = () => {
+                console.error("Failed to load Google Fonts");
+                const title = container.querySelector('#rainbow-title');
+                if (title) title.style.fontFamily = 'monospace';
+                console.log("Fallback to monospace font");
+            };
 
             // Wait for Three.js to load
             const threeScript = container.querySelector('script');
@@ -127,8 +133,9 @@
                         }
                     `;
 
+                    let material;
                     try {
-                        const material = new THREE.ShaderMaterial({
+                        material = new THREE.ShaderMaterial({
                             vertexShader: vertexShader,
                             fragmentShader: fragmentShader,
                             uniforms: {
@@ -139,16 +146,15 @@
                             side: THREE.FrontSide
                         });
                         console.log("Shader material created");
-                        const sphere = new THREE.Mesh(geometry, material);
-                        scene.add(sphere);
-                        console.log("Sphere added to scene");
                     } catch (e) {
                         console.error("Shader creation failed: ", e);
-                        const fallbackMaterial = new THREE.MeshBasicMaterial({ color: 0xff00ff });
-                        const sphere = new THREE.Mesh(geometry, fallbackMaterial);
-                        scene.add(sphere);
-                        console.log("Fallback sphere (magenta) added to scene");
+                        material = new THREE.MeshBasicMaterial({ color: 0xff00ff });
+                        console.log("Fallback to magenta material");
                     }
+
+                    const sphere = new THREE.Mesh(geometry, material);
+                    scene.add(sphere);
+                    console.log("Sphere added to scene");
 
                     // Add point light for additional glow
                     const pointLight = new THREE.PointLight(0xffffff, 1.5, 5);
@@ -186,8 +192,8 @@
                         title.addEventListener('click', () => {
                             console.log("Title clicked, hiding container");
                             container.classList.add('hidden');
-                        });
-                        console.log("Click event listener added");
+                        }, { once: true });
+                        console.log("Click event listener added to title");
                     } else {
                         console.error("Title element not found");
                     }
@@ -200,7 +206,7 @@
                 console.error("Failed to load Three.js from unpkg");
                 container.innerHTML += '<p style="color: white; text-align: center;">Failed to load Three.js library.</p>';
             };
-        }, 1000); // 1-second delay to avoid Miniblox WebGL conflicts
+        }, 2000); // 2-second delay to avoid Miniblox WebGL conflicts
     } catch (e) {
         console.error("Miniblox Rainbow Sphere Extension: Initialization failed: ", e);
     }
