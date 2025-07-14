@@ -6,81 +6,72 @@
         setTimeout(() => {
             console.log("Starting scene setup");
 
-            // Create container for the scene
+            // Create shadow DOM to isolate the scene
+            const host = document.createElement('div');
+            host.id = 'rainbow-host';
+            document.body.appendChild(host);
+            const shadow = host.attachShadow({ mode: 'open' });
+            console.log("Shadow DOM created: #rainbow-host");
+
+            // Inject HTML with container, styles, and scripts
             const container = document.createElement('div');
             container.id = 'rainbow-container';
-            document.body.appendChild(container);
-            console.log("Container created: #rainbow-container");
-
-            // Inject Google Fonts for pixelated text
-            const fontLink = document.createElement('link');
-            fontLink.href = 'https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap';
-            fontLink.rel = 'stylesheet';
-            fontLink.onload = () => console.log("Font loaded successfully");
-            fontLink.onerror = () => console.error("Failed to load Google Fonts");
-            document.head.appendChild(fontLink);
-
-            // Inject styles
-            const style = document.createElement('style');
-            style.textContent = `
-                #rainbow-container { 
-                    margin: 0; 
-                    background: black; 
-                    position: fixed;
-                    top: 0;
-                    left: 0;
-                    width: 100%;
-                    height: 100%;
-                    z-index: 2147483640;
-                }
-                #rainbow-canvas { 
-                    display: block; 
-                    position: absolute;
-                    top: 0;
-                    left: 0;
-                    z-index: 2147483641;
-                }
-                #rainbow-title {
-                    position: absolute;
-                    top: 20px;
-                    left: 50%;
-                    transform: translateX(-50%);
-                    color: white;
-                    font-family: 'Press Start 2P', cursive;
-                    font-size: 1.5em;
-                    text-align: center;
-                    z-index: 2147483642;
-                    text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
-                    cursor: pointer;
-                    animation: wobble 2s ease-in-out infinite;
-                    transition: transform 0.3s ease;
-                }
-                #rainbow-title:hover {
-                    transform: translateX(-50%) scale(1.2);
-                }
-                @keyframes wobble {
-                    0% { transform: translateX(-50%) rotate(0deg); }
-                    25% { transform: translateX(-50%) rotate(2deg); }
-                    75% { transform: translateX(-50%) rotate(-2deg); }
-                    100% { transform: translateX(-50%) rotate(0deg); }
-                }
-                .hidden {
-                    display: none !important;
-                }
+            container.innerHTML = `
+                <style>
+                    #rainbow-container { 
+                        margin: 0; 
+                        background: black; 
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        width: 100%;
+                        height: 100%;
+                        z-index: 2147483640;
+                    }
+                    #rainbow-canvas { 
+                        display: block; 
+                        position: absolute;
+                        top: 0;
+                        left: 0;
+                        z-index: 2147483641;
+                    }
+                    #rainbow-title {
+                        position: absolute;
+                        top: 20px;
+                        left: 50%;
+                        transform: translateX(-50%);
+                        color: white;
+                        font-family: 'Press Start 2P', cursive;
+                        font-size: 1.5em;
+                        text-align: center;
+                        z-index: 2147483642;
+                        text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+                        cursor: pointer;
+                        animation: wobble 2s ease-in-out infinite;
+                        transition: transform 0.3s ease;
+                    }
+                    #rainbow-title:hover {
+                        transform: translateX(-50%) scale(1.2);
+                    }
+                    @keyframes wobble {
+                        0% { transform: translateX(-50%) rotate(0deg); }
+                        25% { transform: translateX(-50%) rotate(2deg); }
+                        75% { transform: translateX(-50%) rotate(-2deg); }
+                        100% { transform: translateX(-50%) rotate(0deg); }
+                    }
+                    .hidden {
+                        display: none !important;
+                    }
+                </style>
+                <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+                <div id="rainbow-title">Rainbow Client</div>
+                <script src="https://unpkg.com/three@0.134.0/build/three.min.js"></script>
             `;
-            document.head.appendChild(style);
-            console.log("Styles injected");
+            shadow.appendChild(container);
+            console.log("Container and styles injected into shadow DOM");
 
-            // Inject title text
-            const title = document.createElement('div');
-            title.id = 'rainbow-title';
-            title.textContent = 'Rainbow Client';
-            container.appendChild(title);
-            console.log("Title created: #rainbow-title");
-
-            // Inject Three.js script
-            const threeScript = document.createElement('script');
-            threeScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js';
+            // Wait for Three.js to load
+            const threeScript = container.querySelector('script');
             threeScript.onload = function() {
                 console.log("Three.js loaded successfully");
                 try {
@@ -172,8 +163,8 @@
                     // Animation loop
                     function animate(t = 0) {
                         requestAnimationFrame(animate);
-                        sphere.rotation.y += 0.01;
-                        if (material.uniforms) {
+                        if (sphere) sphere.rotation.y += 0.01;
+                        if (material && material.uniforms) {
                             material.uniforms.time.value = t * 0.001;
                         }
                         renderer.render(scene, camera);
@@ -190,19 +181,25 @@
                     });
 
                     // Click event to hide everything
-                    title.addEventListener('click', () => {
-                        console.log("Title clicked, hiding container");
-                        container.classList.add('hidden');
-                    });
-                    console.log("Click event listener added");
+                    const title = container.querySelector('#rainbow-title');
+                    if (title) {
+                        title.addEventListener('click', () => {
+                            console.log("Title clicked, hiding container");
+                            container.classList.add('hidden');
+                        });
+                        console.log("Click event listener added");
+                    } else {
+                        console.error("Title element not found");
+                    }
                 } catch (e) {
                     console.error("Error setting up Three.js scene: ", e);
                     container.innerHTML += '<p style="color: white; text-align: center;">Failed to set up 3D scene.</p>';
                 }
             };
-            threeScript.onerror = () => console.error("Failed to load Three.js");
-            document.head.appendChild(threeScript);
-            console.log("Three.js script injected");
+            threeScript.onerror = () => {
+                console.error("Failed to load Three.js from unpkg");
+                container.innerHTML += '<p style="color: white; text-align: center;">Failed to load Three.js library.</p>';
+            };
         }, 1000); // 1-second delay to avoid Miniblox WebGL conflicts
     } catch (e) {
         console.error("Miniblox Rainbow Sphere Extension: Initialization failed: ", e);
