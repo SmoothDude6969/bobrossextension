@@ -1,156 +1,155 @@
-var text = "";
-text += "<!DOCTYPE html>";
-text += "<html lang=\"en\">";
-text += "<head>";
-text += "    <meta charset=\"UTF-8\">";
-text += "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">";
-text += "    <title>Rainbow Glowing Sphere</title>";
-text += "    <link href=\"https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap\" rel=\"stylesheet\">";
-text += "    <style>";
-text += "        body { ";
-text += "            margin: 0; ";
-text += "            background: black; ";
-text += "            overflow: hidden;";
-text += "            position: absolute;";
-text += "            top: 0;";
-text += "            left: 0;";
-text += "            width: 100%;";
-text += "            height: 100%;";
-text += "            z-index: 2147483640; /* Near max z-index for background */";
-text += "        }";
-text += "        canvas { ";
-text += "            display: block; ";
-text += "            position: absolute;";
-text += "            top: 0;";
-text += "            left: 0;";
-text += "            z-index: 2147483641; /* One above body */";
-text += "        }";
-text += "        #title {";
-text += "            position: absolute;";
-text += "            top: 20px;";
-text += "            left: 50%;";
-text += "            transform: translateX(-50%);";
-text += "            color: white;";
-text += "            font-family: 'Press Start 2P', cursive;";
-text += "            font-size: 1.5em;";
-text += "            text-align: center;";
-text += "            z-index: 2147483642; /* Highest z-index for text */";
-text += "            text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);";
-text += "            cursor: pointer;";
-text += "            animation: wobble 2s ease-in-out infinite;";
-text += "            transition: transform 0.3s ease;";
-text += "        }";
-text += "        #title:hover {";
-text += "            transform: translateX(-50%) scale(1.2);";
-text += "        }";
-text += "        @keyframes wobble {";
-text += "            0% { transform: translateX(-50%) rotate(0deg); }";
-text += "            25% { transform: translateX(-50%) rotate(2deg); }";
-text += "            75% { transform: translateX(-50%) rotate(-2deg); }";
-text += "            100% { transform: translateX(-50%) rotate(0deg); }";
-text += "        }";
-text += "        .hidden {";
-text += "            display: none !important;";
-text += "        }";
-text += "    </style>";
-text += "</head>";
-text += "<body>";
-text += "    <div id=\"title\">Rainbow Client (click here)</div>";
-text += "    <script src=\"https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js\"></script>";
-text += "    <script>";
-text += "        // Scene setup";
-text += "        const scene = new THREE.Scene();";
-text += "        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);";
-text += "        const renderer = new THREE.WebGLRenderer({ antialias: false });";
-text += "        renderer.setSize(window.innerWidth, window.innerHeight);";
-text += "        renderer.setPixelRatio(1);";
-text += "        document.body.appendChild(renderer.domElement);";
-text += "";
-text += "        // Check WebGL availability";
-text += "        if (!renderer.getContext()) {";
-text += "            console.error(\"WebGL is not supported or failed to initialize.\");";
-text += "            document.body.innerHTML += '<p style=\"color: white; text-align: center;\">WebGL is not supported in your browser.</p>';";
-text += "            throw new Error(\"WebGL not supported\");";
-text += "        }";
-text += "";
-text += "        // Create sphere geometry";
-text += "        const geometry = new THREE.SphereGeometry(1, 32, 32);";
-text += "";
-text += "        // Custom shader for pixelated rainbow glow effect";
-text += "        const vertexShader = `";
-text += "            varying vec3 vNormal;";
-text += "            varying vec3 vPosition;";
-text += "            void main() {";
-text += "                vNormal = normalize(normalMatrix * normal);";
-text += "                vPosition = (modelViewMatrix * vec4(position, 1.0)).xyz;";
-text += "                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);";
-text += "            }";
-text += "        `;";
-text += "";
-text += "        const fragmentShader = `";
-text += "            varying vec3 vNormal;";
-text += "            varying vec3 vPosition;";
-text += "            uniform float time;";
-text += "            uniform float glowIntensity;";
-text += "            void main() {";
-text += "                // Rainbow color based on position and time";
-text += "                vec3 color = vec3(";
-text += "                    sin(vPosition.x + time) * 0.5 + 0.5,";
-text += "                    sin(vPosition.y + time + 2.0) * 0.5 + 0.5,";
-text += "                    sin(vPosition.z + time + 4.0) * 0.5 + 0.5";
-text += "                );";
-text += "                // Quantize colors for pixelated effect";
-text += "                float pixelSize = 0.1;";
-text += "                color = floor(color / pixelSize) * pixelSize;";
-text += "                float intensity = pow(0.6 - dot(vNormal, normalize(-vPosition)), 2.0) * glowIntensity;";
-text += "                gl_FragColor = vec4(color * intensity, 1.0);";
-text += "            }";
-text += "        `;";
-text += "";
-text += "        const material = new THREE.ShaderMaterial({";
-text += "            vertexShader: vertexShader,";
-text += "            fragmentShader: fragmentShader,";
-text += "            uniforms: {";
-text += "                time: { value: 0.0 },";
-text += "                glowIntensity: { value: 1.5 }";
-text += "            },";
-text += "            transparent: true,";
-text += "            side: THREE.FrontSide";
-text += "        });";
-text += "";
-text += "        // Create sphere mesh";
-text += "        const sphere = new THREE.Mesh(geometry, material);";
-text += "        scene.add(sphere);";
-text += "";
-text += "        // Add point light for additional glow";
-text += "        const pointLight = new THREE.PointLight(0xffffff, 1.5, 5);";
-text += "        pointLight.position.set(0, 0, 0);";
-text += "        scene.add(pointLight);";
-text += "";
-text += "        // Camera position";
-text += "        camera.position.z = 3;";
-text += "";
-text += "        // Animation loop";
-text += "        function animate(t = 0) {";
-text += "            requestAnimationFrame(animate);";
-text += "            sphere.rotation.y += 0.01;";
-text += "            material.uniforms.time.value = t * 0.001;";
-text += "            renderer.render(scene, camera);";
-text += "        }";
-text += "        animate();";
-text += "";
-text += "        // Handle window resize";
-text += "        window.addEventListener('resize', () => {";
-text += "            camera.aspect = window.innerWidth / window.innerHeight;";
-text += "            camera.updateProjectionMatrix();";
-text += "            renderer.setSize(window.innerWidth, window.innerHeight);";
-text += "        });";
-text += "";
-text += "        // Click event to hide everything, including background";
-text += "        const title = document.getElementById('title');";
-text += "        title.addEventListener('click', () => {";
-text += "            document.body.classList.add('hidden');";
-text += "        });";
-text += "    </script>";
-text += "</body>";
-text += "</html>";
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rainbow Glowing Sphere</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            margin: 0; 
+            background: black; 
+            overflow: hidden;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2147483640; /* Near max z-index for background */
+        }
+        canvas { 
+            display: block; 
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 2147483641; /* One above body */
+        }
+        #title {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 1.5em;
+            text-align: center;
+            z-index: 2147483642; /* Highest z-index for text */
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+            cursor: pointer;
+            animation: wobble 2s ease-in-out infinite;
+            transition: transform 0.3s ease;
+        }
+        #title:hover {
+            transform: translateX(-50%) scale(1.2);
+        }
+        @keyframes wobble {
+            0% { transform: translateX(-50%) rotate(0deg); }
+            25% { transform: translateX(-50%) rotate(2deg); }
+            75% { transform: translateX(-50%) rotate(-2deg); }
+            100% { transform: translateX(-50%) rotate(0deg); }
+        }
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div id="title">Rainbow Client</div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+    <script>
+        // Scene setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: false });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(1);
+        document.body.appendChild(renderer.domElement);
+
+        // Check WebGL availability
+        if (!renderer.getContext()) {
+            console.error("WebGL is not supported or failed to initialize.");
+            document.body.innerHTML += '<p style="color: white; text-align: center;">WebGL is not supported in your browser.</p>';
+            throw new Error("WebGL not supported");
+        }
+
+        // Create sphere geometry
+        const geometry = new THREE.SphereGeometry(1, 32, 32);
+
+        // Custom shader for pixelated rainbow glow effect
+        const vertexShader = `
+            varying vec3 vNormal;
+            varying vec3 vPosition;
+            void main() {
+                vNormal = normalize(normalMatrix * normal);
+                vPosition = (modelViewMatrix * vec4(position, 1.0)).xyz;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+        `;
+
+        const fragmentShader = `
+            varying vec3 vNormal;
+            varying vec3 vPosition;
+            uniform float time;
+            uniform float glowIntensity;
+            void main() {
+                // Rainbow color based on position and time
+                vec3 color = vec3(
+                    sin(vPosition.x + time) * 0.5 + 0.5,
+                    sin(vPosition.y + time + 2.0) * 0.5 + 0.5,
+                    sin(vPosition.z + time + 4.0) * 0.5 + 0.5
+                );
+                // Quantize colors for pixelated effect
+                float pixelSize = 0.1;
+                color = floor(color / pixelSize) * pixelSize;
+                float intensity = pow(0.6 - dot(vNormal, normalize(-vPosition)), 2.0) * glowIntensity;
+                gl_FragColor = vec4(color * intensity, 1.0);
+            }
+        `;
+
+        const material = new THREE.ShaderMaterial({
+            vertexShader: vertexShader,
+            fragmentShader: fragmentShader,
+            uniforms: {
+                time: { value: 0.0 },
+                glowIntensity: { value: 1.5 }
+            },
+            transparent: true,
+            side: THREE.FrontSide
+        });
+
+        // Create sphere mesh
+        const sphere = new THREE.Mesh(geometry, material);
+        scene.add(sphere);
+
+        // Add point light for additional glow
+        const pointLight = new THREE.PointLight(0xffffff, 1.5, 5);
+        pointLight.position.set(0, 0, 0);
+        scene.add(pointLight);
+
+        // Camera position
+        camera.position.z = 3;
+
+        // Animation loop
+        function animate(t = 0) {
+            requestAnimationFrame(animate);
+            sphere.rotation.y += 0.01;
+            material.uniforms.time.value = t * 0.001;
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Click event to hide everything, including background
+        const title = document.getElementById('title');
+        title.addEventListener('click', () => {
+            document.body.classList.add('hidden');
+        });
+    </script>
+</body>
+</html>
