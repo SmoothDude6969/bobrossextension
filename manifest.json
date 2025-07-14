@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "Miniblox Rainbow Sphere",
-    "version": "1.1",
+    "version": "1.2",
     "description": "Injects a pixelated rainbow sphere and text into Miniblox.io",
     "content_scripts": [
         {
