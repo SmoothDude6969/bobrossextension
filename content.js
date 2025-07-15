@@ -1,6 +1,6 @@
 (function() {
     try {
-        console.log("Miniblox Gradient Square Extension: Initializing at " + new Date().toISOString());
+        console.log("Miniblox Gradient Extension: Initializing at " + new Date().toISOString());
 
         // Delay execution to avoid WebGL conflicts with Miniblox
         setTimeout(() => {
@@ -31,18 +31,17 @@
                     #gradient-canvas { 
                         display: block; 
                         position: absolute;
-                        top: 50%;
-                        left: 50%;
-                        transform: translate(-50%, -50%);
-                        width: 200px;
-                        height: 200px;
+                        top: 0;
+                        left: 0;
+                        width: 100%;
+                        height: 100%;
                         z-index: 2147483646;
                     }
                     #gradient-title {
                         position: absolute;
-                        top: 20px;
+                        top: 50%;
                         left: 50%;
-                        transform: translateX(-50%);
+                        transform: translate(-50%, -50%);
                         color: white;
                         font-family: 'Press Start 2P', cursive, monospace;
                         font-size: 1.5em;
@@ -54,13 +53,13 @@
                         transition: transform 0.3s ease;
                     }
                     #gradient-title:hover {
-                        transform: translateX(-50%) scale(1.2);
+                        transform: translate(-50%, -50%) scale(1.2);
                     }
                     @keyframes wobble {
-                        0% { transform: translateX(-50%) rotate(0deg); }
-                        25% { transform: translateX(-50%) rotate(2deg); }
-                        75% { transform: translateX(-50%) rotate(-2deg); }
-                        100% { transform: translateX(-50%) rotate(0deg); }
+                        0% { transform: translate(-50%, -50%) rotate(0deg); }
+                        25% { transform: translate(-50%, -50%) rotate(2deg); }
+                        75% { transform: translate(-50%, -50%) rotate(-2deg); }
+                        100% { transform: translate(-50%, -50%) rotate(0deg); }
                     }
                     .hidden {
                         display: none !important;
@@ -83,7 +82,7 @@
                 console.log("Fallback to monospace font");
             };
 
-            // Three.js script (bundled subset for brevity, full version should be included)
+            // Three.js script (using CDN for brevity, bundle in production)
             const threeScript = document.createElement('script');
             threeScript.src = 'https://cdn.jsdelivr.net/npm/three@0.134.0/build/three.min.js';
             threeScript.onload = function() {
@@ -92,12 +91,12 @@
                     // Scene setup
                     console.log("Setting up Three.js scene");
                     const scene = new THREE.Scene();
-                    const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000); // Square aspect ratio
+                    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
                     const renderer = new THREE.WebGLRenderer({
                         canvas: container.querySelector('#gradient-canvas'),
                         antialias: true
                     });
-                    renderer.setSize(200, 200);
+                    renderer.setSize(window.innerWidth, window.innerHeight);
                     console.log("Renderer created and canvas configured");
 
                     // Check WebGL availability
@@ -106,14 +105,16 @@
                         // Fallback to 2D canvas
                         const canvas = container.querySelector('#gradient-canvas');
                         const ctx = canvas.getContext('2d');
+                        canvas.width = window.innerWidth;
+                        canvas.height = window.innerHeight;
                         let time = 0;
                         function draw2DFallback() {
                             time += 0.01;
-                            const gradient = ctx.createLinearGradient(0, 0, 200, 200);
+                            const gradient = ctx.createLinearGradient(0, 0, window.innerWidth, window.innerHeight);
                             gradient.addColorStop(0, `rgb(${Math.sin(time) * 127 + 128}, ${Math.sin(time + 2) * 127 + 128}, ${Math.sin(time + 4) * 127 + 128})`);
                             gradient.addColorStop(1, `rgb(${Math.sin(time + 1) * 127 + 128}, ${Math.sin(time + 3) * 127 + 128}, ${Math.sin(time + 5) * 127 + 128})`);
                             ctx.fillStyle = gradient;
-                            ctx.fillRect(0, 0, 200, 200);
+                            ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
                             requestAnimationFrame(draw2DFallback);
                         }
                         draw2DFallback();
@@ -122,9 +123,10 @@
                     }
                     console.log("WebGL context available");
 
-                    // Create square geometry (plane)
-                    const geometry = new THREE.PlaneGeometry(2, 2);
-                    console.log("Square geometry created");
+                    // Create full-screen plane geometry
+                    const aspect = window.innerWidth / window.innerHeight;
+                    const geometry = new THREE.PlaneGeometry(2 * aspect, 2);
+                    console.log("Full-screen plane geometry created");
 
                     // Custom shader for gradient effect
                     const vertexShader = `
@@ -175,13 +177,13 @@
                     console.log("Square added to scene");
 
                     // Camera position
-                    camera.position.z = 2;
+                    camera.position.z = 1;
                     console.log("Camera positioned");
 
                     // Animation loop
                     function animate(t = 0) {
                         requestAnimationFrame(animate);
-                        if (square) square.rotation.z += 0.01;
+                        if (square) square.rotation.z += 0.005;
                         if (material && material.uniforms) {
                             material.uniforms.time.value = t * 0.001;
                         }
@@ -194,7 +196,13 @@
                     window.addEventListener('resize', () => {
                         const canvas = container.querySelector('#gradient-canvas');
                         if (canvas) {
-                            renderer.setSize(200, 200); // Maintain square size
+                            const aspect = window.innerWidth / window.innerHeight;
+                            square.scale.set(aspect, 1, 1);
+                            camera.aspect = aspect;
+                            camera.updateProjectionMatrix();
+                            renderer.setSize(window.innerWidth, window.innerHeight);
+                            canvas.width = window.innerWidth;
+                            canvas.height = window.innerHeight;
                             console.log("Window resized");
                         }
                     });
@@ -221,14 +229,16 @@
                 // Fallback to 2D canvas
                 const canvas = container.querySelector('#gradient-canvas');
                 const ctx = canvas.getContext('2d');
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
                 let time = 0;
                 function draw2DFallback() {
                     time += 0.01;
-                    const gradient = ctx.createLinearGradient(0, 0, 200, 200);
+                    const gradient = ctx.createLinearGradient(0, 0, window.innerWidth, window.innerHeight);
                     gradient.addColorStop(0, `rgb(${Math.sin(time) * 127 + 128}, ${Math.sin(time + 2) * 127 + 128}, ${Math.sin(time + 4) * 127 + 128})`);
                     gradient.addColorStop(1, `rgb(${Math.sin(time + 1) * 127 + 128}, ${Math.sin(time + 3) * 127 + 128}, ${Math.sin(time + 5) * 127 + 128})`);
                     ctx.fillStyle = gradient;
-                    ctx.fillRect(0, 0, 200, 200);
+                    ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
                     requestAnimationFrame(draw2DFallback);
                 }
                 draw2DFallback();
@@ -236,8 +246,8 @@
             };
             container.appendChild(threeScript);
             console.log("Three.js script injected");
-        }, 3000); // 3-second delay to avoid Miniblox WebGL conflicts
+        }, 4000); // 4-second delay to avoid Miniblox WebGL conflicts
     } catch (e) {
-        console.error("Miniblox Gradient Square Extension: Initialization failed: ", e);
+        console.error("Miniblox Gradient Extension: Initialization failed: ", e);
     }
 })();
