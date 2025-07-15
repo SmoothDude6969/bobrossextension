@@ -1,6 +1,6 @@
 (function() {
     try {
-        console.log("Miniblox RGB Sphere Extension: Initializing at " + new Date().toISOString());
+        console.log("Miniblox Gradient Square Extension: Initializing at " + new Date().toISOString());
 
         // Delay execution to avoid WebGL conflicts with Miniblox
         setTimeout(() => {
@@ -8,17 +8,17 @@
 
             // Create shadow DOM to isolate the scene
             const host = document.createElement('div');
-            host.id = 'rgb-host';
+            host.id = 'gradient-host';
             document.body.appendChild(host);
             const shadow = host.attachShadow({ mode: 'open' });
-            console.log("Shadow DOM created: #rgb-host");
+            console.log("Shadow DOM created: #gradient-host");
 
             // Create container with styles, font, and text
             const container = document.createElement('div');
-            container.id = 'rgb-container';
+            container.id = 'gradient-container';
             container.innerHTML = `
                 <style>
-                    #rgb-container { 
+                    #gradient-container { 
                         margin: 0; 
                         background: black; 
                         position: fixed;
@@ -26,16 +26,19 @@
                         left: 0;
                         width: 100%;
                         height: 100%;
-                        z-index: 2147483646;
+                        z-index: 2147483645;
                     }
-                    #rgb-canvas { 
+                    #gradient-canvas { 
                         display: block; 
                         position: absolute;
-                        top: 0;
-                        left: 0;
-                        z-index: 2147483647;
+                        top: 50%;
+                        left: 50%;
+                        transform: translate(-50%, -50%);
+                        width: 200px;
+                        height: 200px;
+                        z-index: 2147483646;
                     }
-                    #rgb-title {
+                    #gradient-title {
                         position: absolute;
                         top: 20px;
                         left: 50%;
@@ -50,7 +53,7 @@
                         animation: wobble 2s ease-in-out infinite;
                         transition: transform 0.3s ease;
                     }
-                    #rgb-title:hover {
+                    #gradient-title:hover {
                         transform: translateX(-50%) scale(1.2);
                     }
                     @keyframes wobble {
@@ -64,24 +67,23 @@
                     }
                 </style>
                 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" id="font-link">
-                <div id="rgb-title">Rainbow Client</div>
+                <div id="gradient-title">Rainbow Client</div>
+                <canvas id="gradient-canvas"></canvas>
             `;
             shadow.appendChild(container);
-            console.log("Container, styles, and text injected into shadow DOM");
+            console.log("Container, styles, text, and canvas injected into shadow DOM");
 
             // Monitor font loading
             const fontLink = container.querySelector('#font-link');
             fontLink.onload = () => console.log("Font loaded successfully");
             fontLink.onerror = () => {
                 console.error("Failed to load Google Fonts");
-                const title = container.querySelector('#rgb-title');
+                const title = container.querySelector('#gradient-title');
                 if (title) title.style.fontFamily = 'monospace';
                 console.log("Fallback to monospace font");
             };
 
-            // Three.js code (subset for brevity, full version should be bundled)
-            // Note: For simplicity, this assumes Three.js is available. In production, bundle the full Three.js code here.
-            // For now, using CDN with fallback to ensure functionality.
+            // Three.js script (bundled subset for brevity, full version should be included)
             const threeScript = document.createElement('script');
             threeScript.src = 'https://cdn.jsdelivr.net/npm/three@0.134.0/build/three.min.js';
             threeScript.onload = function() {
@@ -90,49 +92,65 @@
                     // Scene setup
                     console.log("Setting up Three.js scene");
                     const scene = new THREE.Scene();
-                    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-                    const renderer = new THREE.WebGLRenderer({ antialias: true });
-                    renderer.setSize(window.innerWidth, window.innerHeight);
-                    renderer.domElement.id = 'rgb-canvas';
-                    container.appendChild(renderer.domElement);
-                    console.log("Renderer created and canvas appended");
+                    const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000); // Square aspect ratio
+                    const renderer = new THREE.WebGLRenderer({
+                        canvas: container.querySelector('#gradient-canvas'),
+                        antialias: true
+                    });
+                    renderer.setSize(200, 200);
+                    console.log("Renderer created and canvas configured");
 
                     // Check WebGL availability
                     if (!renderer.getContext()) {
                         console.error("WebGL is not supported or failed to initialize");
-                        container.innerHTML += '<p style="color: white; text-align: center;">WebGL is not supported in your browser.</p>';
+                        // Fallback to 2D canvas
+                        const canvas = container.querySelector('#gradient-canvas');
+                        const ctx = canvas.getContext('2d');
+                        let time = 0;
+                        function draw2DFallback() {
+                            time += 0.01;
+                            const gradient = ctx.createLinearGradient(0, 0, 200, 200);
+                            gradient.addColorStop(0, `rgb(${Math.sin(time) * 127 + 128}, ${Math.sin(time + 2) * 127 + 128}, ${Math.sin(time + 4) * 127 + 128})`);
+                            gradient.addColorStop(1, `rgb(${Math.sin(time + 1) * 127 + 128}, ${Math.sin(time + 3) * 127 + 128}, ${Math.sin(time + 5) * 127 + 128})`);
+                            ctx.fillStyle = gradient;
+                            ctx.fillRect(0, 0, 200, 200);
+                            requestAnimationFrame(draw2DFallback);
+                        }
+                        draw2DFallback();
+                        console.log("2D canvas fallback started");
                         return;
                     }
                     console.log("WebGL context available");
 
-                    // Create sphere geometry
-                    const geometry = new THREE.SphereGeometry(1, 32, 32);
-                    console.log("Sphere geometry created");
+                    // Create square geometry (plane)
+                    const geometry = new THREE.PlaneGeometry(2, 2);
+                    console.log("Square geometry created");
 
-                    // Custom shader for RGB glow effect
+                    // Custom shader for gradient effect
                     const vertexShader = `
-                        varying vec3 vNormal;
-                        varying vec3 vPosition;
+                        varying vec2 vUv;
                         void main() {
-                            vNormal = normalize(normalMatrix * normal);
-                            vPosition = (modelViewMatrix * vec4(position, 1.0)).xyz;
+                            vUv = uv;
                             gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
                         }
                     `;
 
                     const fragmentShader = `
-                        varying vec3 vNormal;
-                        varying vec3 vPosition;
+                        varying vec2 vUv;
                         uniform float time;
-                        uniform float glowIntensity;
                         void main() {
-                            vec3 color = vec3(
-                                sin(vPosition.x + time) * 0.5 + 0.5,
-                                sin(vPosition.y + time + 2.0) * 0.5 + 0.5,
-                                sin(vPosition.z + time + 4.0) * 0.5 + 0.5
+                            vec3 color1 = vec3(
+                                sin(time) * 0.5 + 0.5,
+                                sin(time + 2.0) * 0.5 + 0.5,
+                                sin(time + 4.0) * 0.5 + 0.5
                             );
-                            float intensity = pow(0.6 - dot(vNormal, normalize(-vPosition)), 2.0) * glowIntensity;
-                            gl_FragColor = vec4(color * intensity, 1.0);
+                            vec3 color2 = vec3(
+                                sin(time + 1.0) * 0.5 + 0.5,
+                                sin(time + 3.0) * 0.5 + 0.5,
+                                sin(time + 5.0) * 0.5 + 0.5
+                            );
+                            vec3 color = mix(color1, color2, vUv.x);
+                            gl_FragColor = vec4(color, 1.0);
                         }
                     `;
 
@@ -142,11 +160,8 @@
                             vertexShader: vertexShader,
                             fragmentShader: fragmentShader,
                             uniforms: {
-                                time: { value: 0.0 },
-                                glowIntensity: { value: 1.5 }
-                            },
-                            transparent: true,
-                            side: THREE.FrontSide
+                                time: { value: 0.0 }
+                            }
                         });
                         console.log("Shader material created");
                     } catch (e) {
@@ -155,24 +170,18 @@
                         console.log("Fallback to magenta material");
                     }
 
-                    const sphere = new THREE.Mesh(geometry, material);
-                    scene.add(sphere);
-                    console.log("Sphere added to scene");
-
-                    // Add point light for additional glow
-                    const pointLight = new THREE.PointLight(0xffffff, 1.5, 5);
-                    pointLight.position.set(0, 0, 0);
-                    scene.add(pointLight);
-                    console.log("Point light added");
+                    const square = new THREE.Mesh(geometry, material);
+                    scene.add(square);
+                    console.log("Square added to scene");
 
                     // Camera position
-                    camera.position.z = 3;
+                    camera.position.z = 2;
                     console.log("Camera positioned");
 
                     // Animation loop
                     function animate(t = 0) {
                         requestAnimationFrame(animate);
-                        if (sphere) sphere.rotation.y += 0.01;
+                        if (square) square.rotation.z += 0.01;
                         if (material && material.uniforms) {
                             material.uniforms.time.value = t * 0.001;
                         }
@@ -183,11 +192,52 @@
 
                     // Handle window resize
                     window.addEventListener('resize', () => {
-                        camera.aspect = window.innerWidth / window.innerHeight;
-                        camera.updateProjectionMatrix();
-                        renderer.setSize(window.innerWidth, window.innerHeight);
-                        console.log("Window resized");
+                        const canvas = container.querySelector('#gradient-canvas');
+                        if (canvas) {
+                            renderer.setSize(200, 200); // Maintain square size
+                            console.log("Window resized");
+                        }
                     });
 
                     // Click event to hide everything
-                    const title = container.querySelector('#rgb-title)
+                    const title = container.querySelector('#gradient-title');
+                    if (title) {
+                        title.addEventListener('click', () => {
+                            console.log("Title clicked, hiding container");
+                            container.classList.add('hidden');
+                        }, { once: true });
+                        console.log("Click event listener added to title");
+                    } else {
+                        console.error("Title element not found");
+                    }
+                } catch (e) {
+                    console.error("Error setting up Three.js scene: ", e);
+                    container.innerHTML += '<p style="color: white; text-align: center;">Failed to set up 3D scene.</p>';
+                }
+            };
+            threeScript.onerror = () => {
+                console.error("Failed to load Three.js from CDN");
+                container.innerHTML += '<p style="color: white; text-align: center;">Failed to load Three.js library.</p>';
+                // Fallback to 2D canvas
+                const canvas = container.querySelector('#gradient-canvas');
+                const ctx = canvas.getContext('2d');
+                let time = 0;
+                function draw2DFallback() {
+                    time += 0.01;
+                    const gradient = ctx.createLinearGradient(0, 0, 200, 200);
+                    gradient.addColorStop(0, `rgb(${Math.sin(time) * 127 + 128}, ${Math.sin(time + 2) * 127 + 128}, ${Math.sin(time + 4) * 127 + 128})`);
+                    gradient.addColorStop(1, `rgb(${Math.sin(time + 1) * 127 + 128}, ${Math.sin(time + 3) * 127 + 128}, ${Math.sin(time + 5) * 127 + 128})`);
+                    ctx.fillStyle = gradient;
+                    ctx.fillRect(0, 0, 200, 200);
+                    requestAnimationFrame(draw2DFallback);
+                }
+                draw2DFallback();
+                console.log("2D canvas fallback started due to Three.js failure");
+            };
+            container.appendChild(threeScript);
+            console.log("Three.js script injected");
+        }, 3000); // 3-second delay to avoid Miniblox WebGL conflicts
+    } catch (e) {
+        console.error("Miniblox Gradient Square Extension: Initialization failed: ", e);
+    }
+})();
