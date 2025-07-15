@@ -1,8 +1,8 @@
 {
     "manifest_version": 3,
-    "name": "Miniblox Gradient Square and Text",
-    "version": "1.0",
-    "description": "Injects a black background, gradient square, and pixelated Rainbow Client text into Miniblox.io",
+    "name": "Miniblox Gradient and Text",
+    "version": "1.4",
+    "description": "Injects a black background, full-screen gradient square, and centered pixelated Rainbow Client text into Miniblox.io",
     "content_scripts": [
         {
             "matches": ["https://miniblox.io/*"],
