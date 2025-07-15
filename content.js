@@ -8,7 +8,7 @@
   container.style.width = '100%';
   container.style.height = '100%';
   container.style.zIndex = '1000000';
-  container.style.pointerEvents = 'none'; // Allow clicks to pass through to the page
+  container.style.pointerEvents = 'none';
 
   // Add HTML for title and credits
   container.innerHTML = `
@@ -41,6 +41,12 @@
       text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
       pointer-events: none;
     ">Made by SmoothDude, Mystic, Jouda</div>
+    <canvas id="rainbow-canvas" style="
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1000001;
+    "></canvas>
   `;
 
   // Add CSS for wobble and hover effects
@@ -58,115 +64,211 @@
     .hidden {
       display: none !important;
     }
-    #rainbow-canvas {
-      position: absolute;
-      top: 0;
-      left: 0;
-      z-index: 1000001;
-    }
   `;
   document.head.appendChild(style);
+  document.body.appendChild(container);
 
-  // Load Three.js
-  const threeScript = document.createElement('script');
-  threeScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js';
-  threeScript.onload = () => {
-    // Three.js scene setup
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    const canvas = renderer.domElement;
-    canvas.id = 'rainbow-canvas';
-    container.appendChild(canvas);
-    document.body.appendChild(container);
+  // WebGL setup
+  const canvas = document.getElementById('rainbow-canvas');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  const gl = canvas.getContext('webgl');
 
-    // Check WebGL availability
-    if (!renderer.getContext()) {
-      console.error("WebGL is not supported or failed to initialize.");
-      container.innerHTML += '<p style="color: white; text-align: center; z-index: 1000002;">WebGL is not supported in your browser.</p>';
-      return;
+  if (!gl) {
+    console.error("WebGL is not supported or failed to initialize.");
+    container.innerHTML += '<p style="color: white; text-align: center; z-index: 1000002;">WebGL is not supported in your browser.</p>';
+    return;
+  }
+
+  // Vertex shader
+  const vertexShaderSource = `
+    attribute vec3 aPosition;
+    attribute vec3 aNormal;
+    uniform mat4 uModelViewMatrix;
+    uniform mat4 uProjectionMatrix;
+    varying vec3 vNormal;
+    varying vec3 vPosition;
+    void main() {
+      vNormal = aNormal;
+      vPosition = (uModelViewMatrix * vec4(aPosition, 1.0)).xyz;
+      gl_Position = uProjectionMatrix * uModelViewMatrix * vec4(aPosition, 1.0);
     }
+  `;
 
-    // Create sphere geometry
-    const geometry = new THREE.SphereGeometry(1, 32, 32);
-
-    // Custom shader for rainbow glow effect
-    const vertexShader = `
-      varying vec3 vNormal;
-      varying vec3 vPosition;
-      void main() {
-        vNormal = normalize(normalMatrix * normal);
-        vPosition = (modelViewMatrix * vec4(position, 1.0)).xyz;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-      }
-    `;
-
-    const fragmentShader = `
-      varying vec3 vNormal;
-      varying vec3 vPosition;
-      uniform float time;
-      uniform float glowIntensity;
-      void main() {
-        vec3 color = vec3(
-          sin(vPosition.x + time) * 0.5 + 0.5,
-          sin(vPosition.y + time + 2.0) * 0.5 + 0.5,
-          sin(vPosition.z + time + 4.0) * 0.5 + 0.5
-        );
-        float intensity = pow(0.6 - dot(vNormal, normalize(-vPosition)), 2.0) * glowIntensity;
-        gl_FragColor = vec4(color * intensity, 1.0);
-      }
-    `;
-
-    const material = new THREE.ShaderMaterial({
-      vertexShader: vertexShader,
-      fragmentShader: fragmentShader,
-      uniforms: {
-        time: { value: 0.0 },
-        glowIntensity: { value: 1.5 }
-      },
-      transparent: true,
-      side: THREE.FrontSide
-    });
-
-    // Create sphere mesh
-    const sphere = new THREE.Mesh(geometry, material);
-    scene.add(sphere);
-
-    // Add point light for additional glow
-    const pointLight = new THREE.PointLight(0xffffff, 1.5, 5);
-    pointLight.position.set(0, 0, 0);
-    scene.add(pointLight);
-
-    // Camera position
-    camera.position.z = 3;
-
-    // Animation loop
-    function animate(t = 0) {
-      requestAnimationFrame(animate);
-      sphere.rotation.y += 0.01;
-      material.uniforms.time.value = t * 0.001;
-      renderer.render(scene, camera);
+  // Fragment shader
+  const fragmentShaderSource = `
+    precision mediump float;
+    varying vec3 vNormal;
+    varying vec3 vPosition;
+    uniform float uTime;
+    uniform float uGlowIntensity;
+    void main() {
+      vec3 color = vec3(
+        sin(vPosition.x + uTime) * 0.5 + 0.5,
+        sin(vPosition.y + uTime + 2.0) * 0.5 + 0.5,
+        sin(vPosition.z + uTime + 4.0) * 0.5 + 0.5
+      );
+      float intensity = pow(0.6 - dot(vNormal, normalize(-vPosition)), 2.0) * uGlowIntensity;
+      gl_FragColor = vec4(color * intensity, 1.0);
     }
-    animate();
+  `;
 
-    // Handle window resize
-    window.addEventListener('resize', () => {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-    });
+  // Compile shaders
+  function createShader(gl, type, source) {
+    const shader = gl.createShader(type);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+      console.error('Shader compile error:', gl.getShaderInfoLog(shader));
+      gl.deleteShader(shader);
+      return null;
+    }
+    return shader;
+  }
 
-    // Click event to hide everything
-    const title = document.getElementById('rainbow-title');
-    title.addEventListener('click', () => {
-      container.classList.add('hidden');
-      scene.children.forEach(child => scene.remove(child));
-    });
-  };
-  threeScript.onerror = () => {
-    console.error("Failed to load Three.js script.");
-    container.innerHTML += '<p style="color: white; text-align: center; z-index: 1000002;">Failed to load Three.js.</p>';
-  };
-  document.head.appendChild(threeScript);
+  const vertexShader = createShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
+  const fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSource);
+  if (!vertexShader || !fragmentShader) return;
+
+  // Create program
+  const program = gl.createProgram();
+  gl.attachShader(program, vertexShader);
+  gl.attachShader(program, fragmentShader);
+  gl.linkProgram(program);
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+    console.error('Program link error:', gl.getProgramInfoLog(program));
+    return;
+  }
+  gl.useProgram(program);
+
+  // Sphere geometry (simple icosphere approximation)
+  const vertices = [];
+  const normals = [];
+  const indices = [];
+  const segments = 16;
+  for (let i = 0; i <= segments; i++) {
+    const theta = (i * Math.PI) / segments;
+    const sinTheta = Math.sin(theta);
+    const cosTheta = Math.cos(theta);
+    for (let j = 0; j <= segments; j++) {
+      const phi = (j * 2 * Math.PI) / segments;
+      const sinPhi = Math.sin(phi);
+      const cosPhi = Math.cos(phi);
+      const x = cosPhi * sinTheta;
+      const y = cosTheta;
+      const z = sinPhi * sinTheta;
+      vertices.push(x, y, z);
+      normals.push(x, y, z);
+    }
+  }
+  for (let i = 0; i < segments; i++) {
+    for (let j = 0; j < segments; j++) {
+      const first = i * (segments + 1) + j;
+      const second = first + segments + 1;
+      indices.push(first, second, first + 1);
+      indices.push(second, second + 1, first + 1);
+    }
+  }
+
+  // Buffers
+  const vertexBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+
+  const normalBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(normals), gl.STATIC_DRAW);
+
+  const indexBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
+
+  // Attributes and uniforms
+  const aPosition = gl.getAttribLocation(program, 'aPosition');
+  gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+  gl.enableVertexAttribArray(aPosition);
+  gl.vertexAttribPointer(aPosition, 3, gl.FLOAT, false, 0, 0);
+
+  const aNormal = gl.getAttribLocation(program, 'aNormal');
+  gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
+  gl.enableVertexAttribArray(aNormal);
+  gl.vertexAttribPointer(aNormal, 3, gl.FLOAT, false, 0, 0);
+
+  const uModelViewMatrix = gl.getUniformLocation(program, 'uModelViewMatrix');
+  const uProjectionMatrix = gl.getUniformLocation(program, 'uProjectionMatrix');
+  const uTime = gl.getUniformLocation(program, 'uTime');
+  const uGlowIntensity = gl.getUniformLocation(program, 'uGlowIntensity');
+
+  // Matrices
+  function createMatrix() {
+    const matrix = new Float32Array(16);
+    matrix[0] = matrix[5] = matrix[10] = matrix[15] = 1;
+    return matrix;
+  }
+
+  function perspective(out, fovy, aspect, near, far) {
+    const f = 1.0 / Math.tan(fovy / 2);
+    const nf = 1 / (near - far);
+    out[0] = f / aspect;
+    out[5] = f;
+    out[10] = (far + near) * nf;
+    out[11] = -1;
+    out[14] = 2 * far * near * nf;
+    return out;
+  }
+
+  function translate(out, x, y, z) {
+    out[12] = x;
+    out[13] = y;
+    out[14] = z;
+    return out;
+  }
+
+  function rotateY(out, angle) {
+    const c = Math.cos(angle);
+    const s = Math.sin(angle);
+    out[0] = c;
+    out[2] = -s;
+    out[8] = s;
+    out[10] = c;
+    return out;
+  }
+
+  const projectionMatrix = perspective(createMatrix(), 75 * Math.PI / 180, window.innerWidth / window.innerHeight, 0.1, 1000);
+  const modelViewMatrix = translate(createMatrix(), 0, 0, -3);
+
+  // Animation loop
+  let time = 0;
+  function animate() {
+    requestAnimationFrame(animate);
+    time += 0.01;
+
+    // Update rotation
+    const rotatedMatrix = rotateY(createMatrix(), time * 0.01);
+    gl.uniformMatrix4fv(uModelViewMatrix, false, rotatedMatrix);
+    gl.uniformMatrix4fv(uProjectionMatrix, false, projectionMatrix);
+    gl.uniform1f(uTime, time);
+    gl.uniform1f(uGlowIntensity, 1.5);
+
+    // Render
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    gl.enable(gl.DEPTH_TEST);
+    gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_SHORT, 0);
+  }
+  animate();
+
+  // Handle window resize
+  window.addEventListener('resize', () => {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    perspective(projectionMatrix, 75 * Math.PI / 180, window.innerWidth / window.innerHeight, 0.1, 1000);
+  });
+
+  // Click event to hide everything
+  const title = document.getElementById('rainbow-title');
+  title.addEventListener('click', () => {
+    container.classList.add('hidden');
+  });
 })();
