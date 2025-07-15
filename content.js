@@ -16,7 +16,7 @@
   container.style.zIndex = '1000000';
   container.style.pointerEvents = 'none';
 
-  // Add HTML for background, title, credits, and canvas
+  // Add HTML for background, title, credits, and canvases
   container.innerHTML = `
     <div id="full-background" style="
       position: absolute;
@@ -73,6 +73,13 @@
       left: 0;
       z-index: 1000001;
     "></canvas>
+    <canvas id="transition-canvas" style="
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1000003;
+      display: none;
+    "></canvas>
   `;
 
   // Add CSS for wobble and hover effects
@@ -94,7 +101,7 @@
   document.head.appendChild(style);
   document.body.appendChild(container);
 
-  // WebGL setup
+  // WebGL setup for sphere
   const canvas = document.getElementById('rainbow-canvas');
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
@@ -106,7 +113,18 @@
     return;
   }
 
-  // Vertex shader
+  // WebGL setup for transition
+  const transitionCanvas = document.getElementById('transition-canvas');
+  transitionCanvas.width = window.innerWidth;
+  transitionCanvas.height = window.innerHeight;
+  const transitionGl = transitionCanvas.getContext('webgl');
+
+  if (!transitionGl) {
+    console.error("Transition WebGL is not supported.");
+    return;
+  }
+
+  // Vertex shader for sphere
   const vertexShaderSource = `
     attribute vec3 aPosition;
     attribute vec3 aNormal;
@@ -138,7 +156,7 @@
         sin(vPosition.y + uTime + 2.0) * 0.4 + 0.4,
         sin(vPosition.z + uTime + 4.0) * 0.4 + 0.4
       );
-      vec3 color = baseColor * (0.5 + 0.5 * diffuse); // Apply diffuse lighting
+      vec3 color = baseColor * (0.5 + 0.5 * diffuse);
       float intensity = pow(0.6 - dot(normal, normalize(-vPosition)), 2.0) * uGlowIntensity;
       gl_FragColor = vec4(color * intensity, 1.0);
     }
@@ -164,6 +182,31 @@
     }
   `;
 
+  // Vertex shader for transition (full-screen quad)
+  const transitionVertexShaderSource = `
+    attribute vec2 aPosition;
+    varying vec2 vUv;
+    void main() {
+      vUv = (aPosition + 1.0) * 0.5;
+      gl_Position = vec4(aPosition, 0.0, 1.0);
+    }
+  `;
+
+  // Fragment shader for pixelation transition
+  const transitionFragmentShaderSource = `
+    precision mediump float;
+    uniform sampler2D uTexture;
+    uniform vec2 uResolution;
+    uniform float uPixelSize;
+    uniform float uOpacity;
+    void main() {
+      vec2 uv = gl_FragCoord.xy / uResolution;
+      vec2 pixelatedUv = floor(uv * uResolution / uPixelSize) * uPixelSize / uResolution;
+      vec4 color = texture2D(uTexture, pixelatedUv);
+      gl_FragColor = vec4(color.rgb, color.a * uOpacity);
+    }
+  `;
+
   // Compile shaders
   function createShader(gl, type, source) {
     const shader = gl.createShader(type);
@@ -177,10 +220,15 @@
     return shader;
   }
 
+  // Sphere shaders
   const vertexShader = createShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
   const fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSource);
   const bloomFragmentShader = createShader(gl, gl.FRAGMENT_SHADER, bloomFragmentShaderSource);
-  if (!vertexShader || !fragmentShader || !bloomFragmentShader) return;
+
+  // Transition shaders
+  const transitionVertexShader = createShader(transitionGl, gl.VERTEX_SHADER, transitionVertexShaderSource);
+  const transitionFragmentShader = createShader(transitionGl, gl.FRAGMENT_SHADER, transitionFragmentShaderSource);
+  if (!vertexShader || !fragmentShader || !bloomFragmentShader || !transitionVertexShader || !transitionFragmentShader) return;
 
   // Create main program
   const program = gl.createProgram();
@@ -202,12 +250,22 @@
     return;
   }
 
+  // Create transition program
+  const transitionProgram = transitionGl.createProgram();
+  transitionGl.attachShader(transitionProgram, transitionVertexShader);
+  transitionGl.attachShader(transitionProgram, transitionFragmentShader);
+  transitionGl.linkProgram(transitionProgram);
+  if (!transitionGl.getProgramParameter(transitionProgram, transitionGl.LINK_STATUS)) {
+    console.error('Transition program link error:', transitionGl.getProgramInfoLog(transitionProgram));
+    return;
+  }
+
   // Sphere geometry (oblate, 64 segments)
   const vertices = [];
   const normals = [];
   const indices = [];
   const segments = 64;
-  const yScale = 0.8; // Oblate sphere
+  const yScale = 0.8;
   for (let i = 0; i <= segments; i++) {
     const theta = (i * Math.PI) / segments;
     const sinTheta = Math.sin(theta);
@@ -232,7 +290,7 @@
     }
   }
 
-  // Buffers
+  // Buffers for sphere
   const vertexBuffer = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
@@ -256,7 +314,7 @@
   gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
   gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, renderTexture, 0);
 
-  // Quad for bloom pass
+  // Quad for bloom and transition
   const quadVertices = new Float32Array([
     -1, -1,  0, 0,
      1, -1,  1, 0,
@@ -271,7 +329,14 @@
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, quadIndexBuffer);
   gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, quadIndices, gl.STATIC_DRAW);
 
-  // Attributes and uniforms
+  const transitionQuadBuffer = transitionGl.createBuffer();
+  transitionGl.bindBuffer(transitionGl.ARRAY_BUFFER, transitionQuadBuffer);
+  transitionGl.bufferData(transitionGl.ARRAY_BUFFER, quadVertices, transitionGl.STATIC_DRAW);
+  const transitionQuadIndexBuffer = transitionGl.createBuffer();
+  transitionGl.bindBuffer(transitionGl.ELEMENT_ARRAY_BUFFER, transitionQuadIndexBuffer);
+  transitionGl.bufferData(transitionGl.ELEMENT_ARRAY_BUFFER, quadIndices, transitionGl.STATIC_DRAW);
+
+  // Attributes and uniforms for sphere
   const aPosition = gl.getAttribLocation(program, 'aPosition');
   const aNormal = gl.getAttribLocation(program, 'aNormal');
   const uModelViewMatrix = gl.getUniformLocation(program, 'uModelViewMatrix');
@@ -284,6 +349,13 @@
   const uTexture = gl.getUniformLocation(bloomProgram, 'uTexture');
   const uResolution = gl.getUniformLocation(bloomProgram, 'uResolution');
   const uBloomRadius = gl.getUniformLocation(bloomProgram, 'uBloomRadius');
+
+  // Attributes and uniforms for transition
+  const aPositionTransition = transitionGl.getAttribLocation(transitionProgram, 'aPosition');
+  const uTextureTransition = transitionGl.getUniformLocation(transitionProgram, 'uTexture');
+  const uResolutionTransition = transitionGl.getUniformLocation(transitionProgram, 'uResolution');
+  const uPixelSize = transitionGl.getUniformLocation(transitionProgram, 'uPixelSize');
+  const uOpacity = transitionGl.getUniformLocation(transitionProgram, 'uOpacity');
 
   // Matrices
   function createMatrix() {
@@ -323,10 +395,11 @@
   const projectionMatrix = perspective(createMatrix(), 75 * Math.PI / 180, window.innerWidth / window.innerHeight, 0.1, 1000);
   const modelViewMatrix = translate(createMatrix(), 0, 0, -3);
 
-  // Animation loop
+  // Animation loop for sphere
   let time = 0;
-  function animate() {
-    requestAnimationFrame(animate);
+  function animateSphere() {
+    if (container.classList.contains('hidden')) return;
+    requestAnimationFrame(animateSphere);
     time += 0.01;
 
     // Render sphere to framebuffer
@@ -343,7 +416,7 @@
     gl.uniformMatrix4fv(uProjectionMatrix, false, projectionMatrix);
     gl.uniform1f(uTime, time);
     gl.uniform1f(uGlowIntensity, 1.5);
-    gl.uniform3f(uLightDirection, 1.0, 1.0, 1.0); // Diagonal light for realism
+    gl.uniform3f(uLightDirection, 1.0, 1.0, 1.0);
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.enable(gl.DEPTH_TEST);
@@ -380,7 +453,42 @@
     gl.uniform3f(uLightDirection, 1.0, 1.0, 1.0);
     gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_SHORT, 0);
   }
-  animate();
+  animateSphere();
+
+  // Transition animation
+  function startTransition() {
+    transitionCanvas.style.display = 'block';
+    container.style.display = 'none';
+    let transitionTime = 0;
+    const duration = 1000; // 1 second
+    function animateTransition(timestamp) {
+      transitionTime += 16; // Approx 60fps
+      const progress = Math.min(transitionTime / duration, 1);
+      const pixelSize = 2 + progress * 48; // 2 to 50 pixels
+      const opacity = 1 - progress;
+
+      transitionGl.useProgram(transitionProgram);
+      transitionGl.bindBuffer(transitionGl.ARRAY_BUFFER, transitionQuadBuffer);
+      transitionGl.enableVertexAttribArray(aPositionTransition);
+      transitionGl.vertexAttribPointer(aPositionTransition, 2, transitionGl.FLOAT, false, 16, 0);
+      transitionGl.bindBuffer(transitionGl.ELEMENT_ARRAY_BUFFER, transitionQuadIndexBuffer);
+      transitionGl.uniform1i(uTextureTransition, 0);
+      transitionGl.uniform2f(uResolutionTransition, transitionCanvas.width, transitionCanvas.height);
+      transitionGl.uniform1f(uPixelSize, pixelSize);
+      transitionGl.uniform1f(uOpacity, opacity);
+      transitionGl.activeTexture(transitionGl.TEXTURE0);
+      transitionGl.bindTexture(transitionGl.TEXTURE_2D, renderTexture);
+      transitionGl.clear(transitionGl.COLOR_BUFFER_BIT);
+      transitionGl.drawElements(transitionGl.TRIANGLES, 6, transitionGl.UNSIGNED_SHORT, 0);
+
+      if (progress < 1) {
+        requestAnimationFrame(animateTransition);
+      } else {
+        transitionCanvas.style.display = 'none';
+      }
+    }
+    requestAnimationFrame(animateTransition);
+  }
 
   // Handle window resize
   window.addEventListener('resize', () => {
@@ -390,11 +498,16 @@
     perspective(projectionMatrix, 75 * Math.PI / 180, window.innerWidth / window.innerHeight, 0.1, 1000);
     gl.bindTexture(gl.TEXTURE_2D, renderTexture);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, canvas.width, canvas.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+
+    transitionCanvas.width = window.innerWidth;
+    transitionCanvas.height = window.innerHeight;
+    transitionGl.viewport(0, 0, transitionCanvas.width, transitionCanvas.height);
   });
 
-  // Click event to hide everything
+  // Click event to start transition
   const title = document.getElementById('rainbow-title');
   title.addEventListener('click', () => {
     container.classList.add('hidden');
+    startTransition();
   });
 })();
