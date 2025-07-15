@@ -10,7 +10,7 @@
   container.style.zIndex = '1000000';
   container.style.pointerEvents = 'none';
 
-  // Add HTML for title and credits
+  // Add HTML for title, credits, background, and canvas
   container.innerHTML = `
     <div id="rainbow-title" style="
       position: absolute;
@@ -41,6 +41,17 @@
       text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
       pointer-events: none;
     ">Made by SmoothDude, Mystic, Jouda</div>
+    <div id="sphere-background" style="
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 300px;
+      height: 300px;
+      background: black;
+      border-radius: 50%;
+      z-index: 1000000;
+    "></div>
     <canvas id="rainbow-canvas" style="
       position: absolute;
       top: 0;
@@ -80,7 +91,7 @@
     return;
   }
 
-  // Vertex shader
+  // Vertex shader for sphere
   const vertexShaderSource = `
     attribute vec3 aPosition;
     attribute vec3 aNormal;
@@ -95,7 +106,7 @@
     }
   `;
 
-  // Fragment shader
+  // Fragment shader for rainbow glow
   const fragmentShaderSource = `
     precision mediump float;
     varying vec3 vNormal;
@@ -110,6 +121,26 @@
       );
       float intensity = pow(0.6 - dot(vNormal, normalize(-vPosition)), 2.0) * uGlowIntensity;
       gl_FragColor = vec4(color * intensity, 1.0);
+    }
+  `;
+
+  // Fragment shader for bloom (simple blur)
+  const bloomFragmentShaderSource = `
+    precision mediump float;
+    uniform sampler2D uTexture;
+    uniform vec2 uResolution;
+    uniform float uBloomRadius;
+    void main() {
+      vec2 uv = gl_FragCoord.xy / uResolution;
+      vec4 sum = vec4(0.0);
+      float scale = uBloomRadius / uResolution.x;
+      for (int x = -4; x <= 4; x++) {
+        for (int y = -4; y <= 4; y++) {
+          vec2 offset = vec2(float(x), float(y)) * scale;
+          sum += texture2D(uTexture, uv + offset) * 0.05;
+        }
+      }
+      gl_FragColor = sum;
     }
   `;
 
@@ -128,9 +159,10 @@
 
   const vertexShader = createShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
   const fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSource);
-  if (!vertexShader || !fragmentShader) return;
+  const bloomFragmentShader = createShader(gl, gl.FRAGMENT_SHADER, bloomFragmentShaderSource);
+  if (!vertexShader || !fragmentShader || !bloomFragmentShader) return;
 
-  // Create program
+  // Create main program
   const program = gl.createProgram();
   gl.attachShader(program, vertexShader);
   gl.attachShader(program, fragmentShader);
@@ -139,13 +171,22 @@
     console.error('Program link error:', gl.getProgramInfoLog(program));
     return;
   }
-  gl.useProgram(program);
 
-  // Sphere geometry (simple icosphere approximation)
+  // Create bloom program
+  const bloomProgram = gl.createProgram();
+  gl.attachShader(bloomProgram, vertexShader);
+  gl.attachShader(bloomProgram, bloomFragmentShader);
+  gl.linkProgram(bloomProgram);
+  if (!gl.getProgramParameter(bloomProgram, gl.LINK_STATUS)) {
+    console.error('Bloom program link error:', gl.getProgramInfoLog(bloomProgram));
+    return;
+  }
+
+  // Sphere geometry (increased vertices)
   const vertices = [];
   const normals = [];
   const indices = [];
-  const segments = 16;
+  const segments = 32; // Increased from 16 for smoother sphere
   for (let i = 0; i <= segments; i++) {
     const theta = (i * Math.PI) / segments;
     const sinTheta = Math.sin(theta);
@@ -183,21 +224,44 @@
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
   gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
 
+  // Framebuffer for bloom
+  const renderTexture = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, renderTexture);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, canvas.width, canvas.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+  const framebuffer = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, renderTexture, 0);
+
+  // Quad for bloom pass
+  const quadVertices = new Float32Array([
+    -1, -1,  0, 0,
+     1, -1,  1, 0,
+     1,  1,  1, 1,
+    -1,  1,  0, 1
+  ]);
+  const quadIndices = new Uint16Array([0, 1, 2, 0, 2, 3]);
+  const quadBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
+  gl.bufferData(gl.ARRAY_BUFFER, quadVertices, gl.STATIC_DRAW);
+  const quadIndexBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, quadIndexBuffer);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, quadIndices, gl.STATIC_DRAW);
+
   // Attributes and uniforms
   const aPosition = gl.getAttribLocation(program, 'aPosition');
-  gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
-  gl.enableVertexAttribArray(aPosition);
-  gl.vertexAttribPointer(aPosition, 3, gl.FLOAT, false, 0, 0);
-
   const aNormal = gl.getAttribLocation(program, 'aNormal');
-  gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
-  gl.enableVertexAttribArray(aNormal);
-  gl.vertexAttribPointer(aNormal, 3, gl.FLOAT, false, 0, 0);
-
   const uModelViewMatrix = gl.getUniformLocation(program, 'uModelViewMatrix');
   const uProjectionMatrix = gl.getUniformLocation(program, 'uProjectionMatrix');
   const uTime = gl.getUniformLocation(program, 'uTime');
   const uGlowIntensity = gl.getUniformLocation(program, 'uGlowIntensity');
+
+  const aPositionBloom = gl.getAttribLocation(bloomProgram, 'aPosition');
+  const uTexture = gl.getUniformLocation(bloomProgram, 'uTexture');
+  const uResolution = gl.getUniformLocation(bloomProgram, 'uResolution');
+  const uBloomRadius = gl.getUniformLocation(bloomProgram, 'uBloomRadius');
 
   // Matrices
   function createMatrix() {
@@ -243,17 +307,53 @@
     requestAnimationFrame(animate);
     time += 0.01;
 
-    // Update rotation
-    const rotatedMatrix = rotateY(createMatrix(), time * 0.01);
-    gl.uniformMatrix4fv(uModelViewMatrix, false, rotatedMatrix);
+    // Render sphere to framebuffer
+    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+    gl.useProgram(program);
+    gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+    gl.enableVertexAttribArray(aPosition);
+    gl.vertexAttribPointer(aPosition, 3, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
+    gl.enableVertexAttribArray(aNormal);
+    gl.vertexAttribPointer(aNormal, 3, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+    gl.uniformMatrix4fv(uModelViewMatrix, false, rotateY(createMatrix(), time * 0.01));
     gl.uniformMatrix4fv(uProjectionMatrix, false, projectionMatrix);
     gl.uniform1f(uTime, time);
     gl.uniform1f(uGlowIntensity, 1.5);
-
-    // Render
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.enable(gl.DEPTH_TEST);
+    gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_SHORT, 0);
+
+    // Render bloom pass
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.useProgram(bloomProgram);
+    gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
+    gl.enableVertexAttribArray(aPositionBloom);
+    gl.vertexAttribPointer(aPositionBloom, 2, gl.FLOAT, false, 16, 0);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, quadIndexBuffer);
+    gl.uniform1i(uTexture, 0);
+    gl.uniform2f(uResolution, canvas.width, canvas.height);
+    gl.uniform1f(uBloomRadius, 2.0);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, renderTexture);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
+
+    // Render sphere again for crisp edges
+    gl.useProgram(program);
+    gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+    gl.enableVertexAttribArray(aPosition);
+    gl.vertexAttribPointer(aPosition, 3, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
+    gl.enableVertexAttribArray(aNormal);
+    gl.vertexAttribPointer(aNormal, 3, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+    gl.uniformMatrix4fv(uModelViewMatrix, false, rotateY(createMatrix(), time * 0.01));
+    gl.uniformMatrix4fv(uProjectionMatrix, false, projectionMatrix);
+    gl.uniform1f(uTime, time);
+    gl.uniform1f(uGlowIntensity, 1.5);
     gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_SHORT, 0);
   }
   animate();
@@ -264,6 +364,8 @@
     canvas.height = window.innerHeight;
     gl.viewport(0, 0, canvas.width, canvas.height);
     perspective(projectionMatrix, 75 * Math.PI / 180, window.innerWidth / window.innerHeight, 0.1, 1000);
+    gl.bindTexture(gl.TEXTURE_2D, renderTexture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, canvas.width, canvas.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
   });
 
   // Click event to hide everything
