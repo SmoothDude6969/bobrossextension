@@ -39,7 +39,7 @@
       top: 20%;
       left: 50%;
       transform: translate(-50%, -50%);
-      color: white;
+      color: black;
       font-family: 'Press Start 2P', cursive;
       font-size: 1.5em;
       text-align: center;
