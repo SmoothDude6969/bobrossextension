@@ -190,4 +190,4 @@
                     });
 
                     // Click event to hide everything
-                    const title = container.querySelector('#rgb-title
+                    const title = container.querySelector('#rgb-title)
