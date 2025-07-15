@@ -1,4 +1,10 @@
 (function () {
+  // Add pixel font
+  const fontLink = document.createElement('link');
+  fontLink.href = 'https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap';
+  fontLink.rel = 'stylesheet';
+  document.head.appendChild(fontLink);
+
   // Create container for the sphere and text
   const container = document.createElement('div');
   container.id = 'rainbow-sphere-container';
@@ -10,16 +16,25 @@
   container.style.zIndex = '1000000';
   container.style.pointerEvents = 'none';
 
-  // Add HTML for title, credits, background, and canvas
+  // Add HTML for background, title, credits, and canvas
   container.innerHTML = `
+    <div id="full-background" style="
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: black;
+      z-index: 999999;
+    "></div>
     <div id="rainbow-title" style="
       position: absolute;
       top: 20px;
       left: 50%;
       transform: translateX(-50%);
       color: white;
-      font-family: Arial, sans-serif;
-      font-size: 2em;
+      font-family: 'Press Start 2P', cursive;
+      font-size: 1.5em;
       text-align: center;
       z-index: 1000002;
       text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
@@ -34,8 +49,8 @@
       left: 50%;
       transform: translateX(-50%);
       color: white;
-      font-family: Arial, sans-serif;
-      font-size: 1.2em;
+      font-family: 'Press Start 2P', cursive;
+      font-size: 0.9em;
       text-align: center;
       z-index: 1000002;
       text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
@@ -91,7 +106,7 @@
     return;
   }
 
-  // Vertex shader for sphere
+  // Vertex shader
   const vertexShaderSource = `
     attribute vec3 aPosition;
     attribute vec3 aNormal;
@@ -124,7 +139,7 @@
     }
   `;
 
-  // Fragment shader for bloom (simple blur)
+  // Fragment shader for bloom
   const bloomFragmentShaderSource = `
     precision mediump float;
     uniform sampler2D uTexture;
@@ -182,11 +197,12 @@
     return;
   }
 
-  // Sphere geometry (increased vertices)
+  // Sphere geometry (increased vertices, shorter height)
   const vertices = [];
   const normals = [];
   const indices = [];
-  const segments = 32; // Increased from 16 for smoother sphere
+  const segments = 64; // Increased to 64 for smoother sphere
+  const yScale = 0.8; // Reduce height to make sphere shorter
   for (let i = 0; i <= segments; i++) {
     const theta = (i * Math.PI) / segments;
     const sinTheta = Math.sin(theta);
@@ -196,10 +212,10 @@
       const sinPhi = Math.sin(phi);
       const cosPhi = Math.cos(phi);
       const x = cosPhi * sinTheta;
-      const y = cosTheta;
+      const y = cosTheta * yScale; // Scale y to make sphere shorter
       const z = sinPhi * sinTheta;
       vertices.push(x, y, z);
-      normals.push(x, y, z);
+      normals.push(x, y / yScale, z); // Adjust normal for correct lighting
     }
   }
   for (let i = 0; i < segments; i++) {
