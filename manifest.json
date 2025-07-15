@@ -1,16 +1,20 @@
 {
-    "manifest_version": 3,
-    "name": "Miniblox Gradient and Text",
-    "version": "1.5",
-    "description": "Injects a black background, full-screen gradient square, and centered pixelated Rainbow Client text into Miniblox.io",
-    "content_scripts": [
-        {
-            "matches": ["https://miniblox.io/*"],
-            "js": ["content.js"],
-            "run_at": "document_end"
-        }
-    ],
-    "permissions": [
-        "activeTab"
-    ]
+  "manifest_version": 3,
+  "name": "Rainbow Sphere Overlay",
+  "version": "1.0",
+  "description": "Displays a rainbow glowing sphere with text overlay on miniblox.io",
+  "permissions": [
+    "activeTab",
+    "scripting"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://miniblox.io/*"],
+      "js": ["content.js"],
+      "run_at": "document_end"
+    }
+  ],
+  "icons": {
+    "128": "icon.png"
+  }
 }
