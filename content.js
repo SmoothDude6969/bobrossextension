@@ -29,9 +29,9 @@
     "></div>
     <div id="rainbow-title" style="
       position: absolute;
-      top: 20px;
+      top: 20%;
       left: 50%;
-      transform: translateX(-50%);
+      transform: translate(-50%, -50%);
       color: white;
       font-family: 'Press Start 2P', cursive;
       font-size: 1.5em;
@@ -79,13 +79,13 @@
   const style = document.createElement('style');
   style.textContent = `
     @keyframes wobble {
-      0% { transform: translateX(-50%) rotate(0deg); }
-      25% { transform: translateX(-50%) rotate(2deg); }
-      75% { transform: translateX(-50%) rotate(-2deg); }
-      100% { transform: translateX(-50%) rotate(0deg); }
+      0% { transform: translate(-50%, -50%) rotate(0deg); }
+      25% { transform: translate(-50%, -50%) rotate(2deg); }
+      75% { transform: translate(-50%, -50%) rotate(-2deg); }
+      100% { transform: translate(-50%, -50%) rotate(0deg); }
     }
     #rainbow-title:hover {
-      transform: translateX(-50%) scale(1.2);
+      transform: translate(-50%, -50%) scale(1.2);
     }
     .hidden {
       display: none !important;
@@ -121,20 +121,25 @@
     }
   `;
 
-  // Fragment shader for rainbow glow
+  // Fragment shader for realistic rainbow glow
   const fragmentShaderSource = `
     precision mediump float;
     varying vec3 vNormal;
     varying vec3 vPosition;
     uniform float uTime;
     uniform float uGlowIntensity;
+    uniform vec3 uLightDirection;
     void main() {
-      vec3 color = vec3(
-        sin(vPosition.x + uTime) * 0.5 + 0.5,
-        sin(vPosition.y + uTime + 2.0) * 0.5 + 0.5,
-        sin(vPosition.z + uTime + 4.0) * 0.5 + 0.5
+      vec3 normal = normalize(vNormal);
+      vec3 lightDir = normalize(uLightDirection);
+      float diffuse = max(dot(normal, lightDir), 0.0);
+      vec3 baseColor = vec3(
+        sin(vPosition.x + uTime) * 0.4 + 0.4,
+        sin(vPosition.y + uTime + 2.0) * 0.4 + 0.4,
+        sin(vPosition.z + uTime + 4.0) * 0.4 + 0.4
       );
-      float intensity = pow(0.6 - dot(vNormal, normalize(-vPosition)), 2.0) * uGlowIntensity;
+      vec3 color = baseColor * (0.5 + 0.5 * diffuse); // Apply diffuse lighting
+      float intensity = pow(0.6 - dot(normal, normalize(-vPosition)), 2.0) * uGlowIntensity;
       gl_FragColor = vec4(color * intensity, 1.0);
     }
   `;
@@ -197,12 +202,12 @@
     return;
   }
 
-  // Sphere geometry (increased vertices, shorter height)
+  // Sphere geometry (oblate, 64 segments)
   const vertices = [];
   const normals = [];
   const indices = [];
-  const segments = 64; // Increased to 64 for smoother sphere
-  const yScale = 0.8; // Reduce height to make sphere shorter
+  const segments = 64;
+  const yScale = 0.8; // Oblate sphere
   for (let i = 0; i <= segments; i++) {
     const theta = (i * Math.PI) / segments;
     const sinTheta = Math.sin(theta);
@@ -212,10 +217,10 @@
       const sinPhi = Math.sin(phi);
       const cosPhi = Math.cos(phi);
       const x = cosPhi * sinTheta;
-      const y = cosTheta * yScale; // Scale y to make sphere shorter
+      const y = cosTheta * yScale;
       const z = sinPhi * sinTheta;
       vertices.push(x, y, z);
-      normals.push(x, y / yScale, z); // Adjust normal for correct lighting
+      normals.push(x, y / yScale, z);
     }
   }
   for (let i = 0; i < segments; i++) {
@@ -273,6 +278,7 @@
   const uProjectionMatrix = gl.getUniformLocation(program, 'uProjectionMatrix');
   const uTime = gl.getUniformLocation(program, 'uTime');
   const uGlowIntensity = gl.getUniformLocation(program, 'uGlowIntensity');
+  const uLightDirection = gl.getUniformLocation(program, 'uLightDirection');
 
   const aPositionBloom = gl.getAttribLocation(bloomProgram, 'aPosition');
   const uTexture = gl.getUniformLocation(bloomProgram, 'uTexture');
@@ -337,6 +343,7 @@
     gl.uniformMatrix4fv(uProjectionMatrix, false, projectionMatrix);
     gl.uniform1f(uTime, time);
     gl.uniform1f(uGlowIntensity, 1.5);
+    gl.uniform3f(uLightDirection, 1.0, 1.0, 1.0); // Diagonal light for realism
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.enable(gl.DEPTH_TEST);
@@ -370,6 +377,7 @@
     gl.uniformMatrix4fv(uProjectionMatrix, false, projectionMatrix);
     gl.uniform1f(uTime, time);
     gl.uniform1f(uGlowIntensity, 1.5);
+    gl.uniform3f(uLightDirection, 1.0, 1.0, 1.0);
     gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_SHORT, 0);
   }
   animate();
