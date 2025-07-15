@@ -1,4 +1,17 @@
 (function () {
+  // Add pixel font
+  const fontLink = document.createElement('link');
+  fontLink.href = 'https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap';
+  fontLink.rel = 'stylesheet';
+  document.head.appendChild(fontLink);
+
+  // Load html2canvas for capturing the overlay
+  const html2canvasScript = document.createElement('script');
+  html2canvasScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+  html2canvasScript.onload = () => console.log("html2canvas loaded");
+  html2canvasScript.onerror = () => console.error("html2canvas failed to load");
+  document.head.appendChild(html2canvasScript);
+
   // Create container for the sphere and text
   const container = document.createElement('div');
   container.id = 'rainbow-sphere-container';
@@ -10,16 +23,25 @@
   container.style.zIndex = '1000000';
   container.style.pointerEvents = 'none';
 
-  // Add HTML for title, credits, background, and canvas
+  // Add HTML for background, title, credits, and canvases
   container.innerHTML = `
+    <div id="full-background" style="
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: black;
+      z-index: 999999;
+    "></div>
     <div id="rainbow-title" style="
       position: absolute;
-      top: 20px;
+      top: 20%;
       left: 50%;
-      transform: translateX(-50%);
+      transform: translate(-50%, -50%);
       color: white;
-      font-family: Arial, sans-serif;
-      font-size: 2em;
+      font-family: 'Press Start 2P', cursive;
+      font-size: 1.5em;
       text-align: center;
       z-index: 1000002;
       text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
@@ -33,9 +55,9 @@
       bottom: 20px;
       left: 50%;
       transform: translateX(-50%);
-      color: white;
-      font-family: Arial, sans-serif;
-      font-size: 1.2em;
+      color: black;
+      font-family: 'Press Start 2P', cursive;
+      font-size: 0.9em;
       text-align: center;
       z-index: 1000002;
       text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
@@ -58,19 +80,27 @@
       left: 0;
       z-index: 1000001;
     "></canvas>
+    <canvas id="transition-canvas" style="
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1000003;
+      display: none;
+      image-rendering: pixelated;
+    "></canvas>
   `;
 
   // Add CSS for wobble and hover effects
   const style = document.createElement('style');
   style.textContent = `
     @keyframes wobble {
-      0% { transform: translateX(-50%) rotate(0deg); }
-      25% { transform: translateX(-50%) rotate(2deg); }
-      75% { transform: translateX(-50%) rotate(-2deg); }
-      100% { transform: translateX(-50%) rotate(0deg); }
+      0% { transform: translate(-50%, -50%) rotate(0deg); }
+      25% { transform: translate(-50%, -50%) rotate(2deg); }
+      75% { transform: translate(-50%, -50%) rotate(-2deg); }
+      100% { transform: translate(-50%, -50%) rotate(0deg); }
     }
     #rainbow-title:hover {
-      transform: translateX(-50%) scale(1.2);
+      transform: translate(-50%, -50%) scale(1.2);
     }
     .hidden {
       display: none !important;
@@ -79,7 +109,7 @@
   document.head.appendChild(style);
   document.body.appendChild(container);
 
-  // WebGL setup
+  // WebGL setup for sphere
   const canvas = document.getElementById('rainbow-canvas');
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
@@ -89,6 +119,36 @@
     console.error("WebGL is not supported or failed to initialize.");
     container.innerHTML += '<p style="color: white; text-align: center; z-index: 1000002;">WebGL is not supported in your browser.</p>';
     return;
+  }
+
+  // Sphere geometry (oblate, 64 segments)
+  const vertices = [];
+  const normals = [];
+  const indices = [];
+  const segments = 64;
+  const yScale = 0.8;
+  for (let i = 0; i <= segments; i++) {
+    const theta = (i * Math.PI) / segments;
+    const sinTheta = Math.sin(theta);
+    const cosTheta = Math.cos(theta);
+    for (let j = 0; j <= segments; j++) {
+      const phi = (j * 2 * Math.PI) / segments;
+      const sinPhi = Math.sin(phi);
+      const cosPhi = Math.cos(phi);
+      const x = cosPhi * sinTheta;
+      const y = cosTheta * yScale;
+      const z = sinPhi * sinTheta;
+      vertices.push(x, y, z);
+      normals.push(x, y / yScale, z);
+    }
+  }
+  for (let i = 0; i < segments; i++) {
+    for (let j = 0; j < segments; j++) {
+      const first = i * (segments + 1) + j;
+      const second = first + segments + 1;
+      indices.push(first, second, first + 1);
+      indices.push(second, second + 1, first + 1);
+    }
   }
 
   // Vertex shader for sphere
@@ -106,25 +166,30 @@
     }
   `;
 
-  // Fragment shader for rainbow glow
+  // Fragment shader for realistic rainbow glow
   const fragmentShaderSource = `
     precision mediump float;
     varying vec3 vNormal;
     varying vec3 vPosition;
     uniform float uTime;
     uniform float uGlowIntensity;
+    uniform vec3 uLightDirection;
     void main() {
-      vec3 color = vec3(
-        sin(vPosition.x + uTime) * 0.5 + 0.5,
-        sin(vPosition.y + uTime + 2.0) * 0.5 + 0.5,
-        sin(vPosition.z + uTime + 4.0) * 0.5 + 0.5
+      vec3 normal = normalize(vNormal);
+      vec3 lightDir = normalize(uLightDirection);
+      float diffuse = max(dot(normal, lightDir), 0.0);
+      vec3 baseColor = vec3(
+        sin(vPosition.x + uTime) * 0.4 + 0.4,
+        sin(vPosition.y + uTime + 2.0) * 0.4 + 0.4,
+        sin(vPosition.z + uTime + 4.0) * 0.4 + 0.4
       );
-      float intensity = pow(0.6 - dot(vNormal, normalize(-vPosition)), 2.0) * uGlowIntensity;
+      vec3 color = baseColor * (0.5 + 0.5 * diffuse);
+      float intensity = pow(0.6 - dot(normal, normalize(-vPosition)), 2.0) * uGlowIntensity;
       gl_FragColor = vec4(color * intensity, 1.0);
     }
   `;
 
-  // Fragment shader for bloom (simple blur)
+  // Fragment shader for bloom
   const bloomFragmentShaderSource = `
     precision mediump float;
     uniform sampler2D uTexture;
@@ -182,36 +247,7 @@
     return;
   }
 
-  // Sphere geometry (increased vertices)
-  const vertices = [];
-  const normals = [];
-  const indices = [];
-  const segments = 32; // Increased from 16 for smoother sphere
-  for (let i = 0; i <= segments; i++) {
-    const theta = (i * Math.PI) / segments;
-    const sinTheta = Math.sin(theta);
-    const cosTheta = Math.cos(theta);
-    for (let j = 0; j <= segments; j++) {
-      const phi = (j * 2 * Math.PI) / segments;
-      const sinPhi = Math.sin(phi);
-      const cosPhi = Math.cos(phi);
-      const x = cosPhi * sinTheta;
-      const y = cosTheta;
-      const z = sinPhi * sinTheta;
-      vertices.push(x, y, z);
-      normals.push(x, y, z);
-    }
-  }
-  for (let i = 0; i < segments; i++) {
-    for (let j = 0; j < segments; j++) {
-      const first = i * (segments + 1) + j;
-      const second = first + segments + 1;
-      indices.push(first, second, first + 1);
-      indices.push(second, second + 1, first + 1);
-    }
-  }
-
-  // Buffers
+  // Buffers for sphere
   const vertexBuffer = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
@@ -235,7 +271,7 @@
   gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
   gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, renderTexture, 0);
 
-  // Quad for bloom pass
+  // Quad for bloom
   const quadVertices = new Float32Array([
     -1, -1,  0, 0,
      1, -1,  1, 0,
@@ -250,13 +286,14 @@
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, quadIndexBuffer);
   gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, quadIndices, gl.STATIC_DRAW);
 
-  // Attributes and uniforms
+  // Attributes and uniforms for sphere
   const aPosition = gl.getAttribLocation(program, 'aPosition');
   const aNormal = gl.getAttribLocation(program, 'aNormal');
   const uModelViewMatrix = gl.getUniformLocation(program, 'uModelViewMatrix');
   const uProjectionMatrix = gl.getUniformLocation(program, 'uProjectionMatrix');
   const uTime = gl.getUniformLocation(program, 'uTime');
   const uGlowIntensity = gl.getUniformLocation(program, 'uGlowIntensity');
+  const uLightDirection = gl.getUniformLocation(program, 'uLightDirection');
 
   const aPositionBloom = gl.getAttribLocation(bloomProgram, 'aPosition');
   const uTexture = gl.getUniformLocation(bloomProgram, 'uTexture');
@@ -301,10 +338,11 @@
   const projectionMatrix = perspective(createMatrix(), 75 * Math.PI / 180, window.innerWidth / window.innerHeight, 0.1, 1000);
   const modelViewMatrix = translate(createMatrix(), 0, 0, -3);
 
-  // Animation loop
+  // Animation loop for sphere
   let time = 0;
-  function animate() {
-    requestAnimationFrame(animate);
+  function animateSphere() {
+    if (container.classList.contains('hidden')) return;
+    requestAnimationFrame(animateSphere);
     time += 0.01;
 
     // Render sphere to framebuffer
@@ -321,6 +359,7 @@
     gl.uniformMatrix4fv(uProjectionMatrix, false, projectionMatrix);
     gl.uniform1f(uTime, time);
     gl.uniform1f(uGlowIntensity, 1.5);
+    gl.uniform3f(uLightDirection, 1.0, 1.0, 1.0);
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.enable(gl.DEPTH_TEST);
@@ -354,9 +393,68 @@
     gl.uniformMatrix4fv(uProjectionMatrix, false, projectionMatrix);
     gl.uniform1f(uTime, time);
     gl.uniform1f(uGlowIntensity, 1.5);
+    gl.uniform3f(uLightDirection, 1.0, 1.0, 1.0);
     gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_SHORT, 0);
   }
-  animate();
+  animateSphere();
+
+  // Transition animation using CSS
+  function startTransition() {
+    const transitionCanvas = document.getElementById('transition-canvas');
+    transitionCanvas.style.display = 'block';
+    if (typeof html2canvas === 'undefined') {
+      console.error("html2canvas not loaded, falling back to fade-out.");
+      container.style.transition = 'opacity 1s';
+      container.style.opacity = '0';
+      setTimeout(() => {
+        container.classList.add('hidden');
+        container.style.opacity = '1';
+      }, 1000);
+      return;
+    }
+
+    console.log("Starting pixelation transition");
+    html2canvas(container, { backgroundColor: null, scale: 1 }).then(canvasSnapshot => {
+      const ctx = transitionCanvas.getContext('2d');
+      transitionCanvas.width = window.innerWidth;
+      transitionCanvas.height = window.innerHeight;
+      ctx.imageSmoothingEnabled = false;
+      let progress = 0;
+      const duration = 1000;
+
+      function animateTransition() {
+        progress += 16 / duration;
+        if (progress >= 1) {
+          transitionCanvas.style.display = 'none';
+          container.classList.add('hidden');
+          container.style.opacity = '1';
+          console.log("Transition completed");
+          return;
+        }
+
+        const scale = 1 - progress * 0.9;
+        const opacity = 1 - progress;
+        transitionCanvas.style.opacity = opacity;
+        ctx.clearRect(0, 0, transitionCanvas.width, transitionCanvas.height);
+        ctx.save();
+        ctx.scale(scale, scale);
+        ctx.drawImage(canvasSnapshot, 0, 0, transitionCanvas.width / scale, transitionCanvas.height / scale);
+        ctx.restore();
+        requestAnimationFrame(animateTransition);
+      }
+
+      // Keep container visible during transition
+      animateTransition();
+    }).catch(err => {
+      console.error("html2canvas error:", err);
+      container.style.transition = 'opacity 1s';
+      container.style.opacity = '0';
+      setTimeout(() => {
+        container.classList.add('hidden');
+        container.style.opacity = '1';
+      }, 1000);
+    });
+  }
 
   // Handle window resize
   window.addEventListener('resize', () => {
@@ -368,9 +466,10 @@
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, canvas.width, canvas.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
   });
 
-  // Click event to hide everything
+  // Click event to start transition
   const title = document.getElementById('rainbow-title');
-  title.addEventListener('click', () => {
-    container.classList.add('hidden');
-  });
+  title.addEventListener('click', startTransition);
+
+  // Log to confirm loading
+  console.log("Extension loaded");
 })();
