@@ -1,8 +1,8 @@
 {
     "manifest_version": 3,
-    "name": "Miniblox Rainbow Sphere",
-    "version": "1.4",
-    "description": "Injects a pixelated rainbow sphere and text into Miniblox.io",
+    "name": "Miniblox RGB Sphere",
+    "version": "1.0",
+    "description": "Injects a black background and RGB glowing sphere into Miniblox.io",
     "content_scripts": [
         {
             "matches": ["https://miniblox.io/*"],
@@ -15,7 +15,7 @@
     ],
     "web_accessible_resources": [
         {
-            "resources": ["https://unpkg.com/three@0.134.0/build/three.min.js"],
+            "resources": ["https://cdn.jsdelivr.net/npm/three@0.134.0/build/three.min.js"],
             "matches": ["https://miniblox.io/*"]
         }
     ]
