@@ -44,7 +44,7 @@
                         transform: translate(-50%, -50%);
                         color: white;
                         font-family: 'Press Start 2P', cursive, monospace;
-                        font-size: 1.5em;
+                        font-size: 2em;
                         text-align: center;
                         z-index: 2147483647;
                         text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
@@ -82,7 +82,8 @@
                 console.log("Fallback to monospace font");
             };
 
-            // Three.js script (using CDN for brevity, bundle in production)
+            // Embed Three.js (minified subset for brevity, full version should be included)
+            // For testing, using CDN with fallback. Replace with full Three.js code if CSP blocks.
             const threeScript = document.createElement('script');
             threeScript.src = 'https://cdn.jsdelivr.net/npm/three@0.134.0/build/three.min.js';
             threeScript.onload = function() {
@@ -246,7 +247,7 @@
             };
             container.appendChild(threeScript);
             console.log("Three.js script injected");
-        }, 4000); // 4-second delay to avoid Miniblox WebGL conflicts
+        }, 5000); // 5-second delay to avoid Miniblox WebGL conflicts
     } catch (e) {
         console.error("Miniblox Gradient Extension: Initialization failed: ", e);
     }
