@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "Miniblox RGB Sphere",
-    "version": "1.0",
+    "version": "1.1",
     "description": "Injects a black background and RGB glowing sphere into Miniblox.io",
     "content_scripts": [
         {
@@ -12,11 +12,5 @@
     ],
     "permissions": [
         "activeTab"
-    ],
-    "web_accessible_resources": [
-        {
-            "resources": ["https://cdn.jsdelivr.net/npm/three@0.134.0/build/three.min.js"],
-            "matches": ["https://miniblox.io/*"]
-        }
     ]
 }
