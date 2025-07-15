@@ -13,7 +13,7 @@
             const shadow = host.attachShadow({ mode: 'open' });
             console.log("Shadow DOM created: #rgb-host");
 
-            // Create container
+            // Create container with styles, font, and text
             const container = document.createElement('div');
             container.id = 'rgb-container';
             container.innerHTML = `
@@ -35,163 +35,159 @@
                         left: 0;
                         z-index: 2147483647;
                     }
-                    #fallback-canvas {
-                        display: none;
+                    #rgb-title {
                         position: absolute;
-                        top: 50%;
+                        top: 20px;
                         left: 50%;
-                        transform: translate(-50%, -50%);
+                        transform: translateX(-50%);
+                        color: white;
+                        font-family: 'Press Start 2P', cursive, monospace;
+                        font-size: 1.5em;
+                        text-align: center;
                         z-index: 2147483647;
+                        text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+                        cursor: pointer;
+                        animation: wobble 2s ease-in-out infinite;
+                        transition: transform 0.3s ease;
+                    }
+                    #rgb-title:hover {
+                        transform: translateX(-50%) scale(1.2);
+                    }
+                    @keyframes wobble {
+                        0% { transform: translateX(-50%) rotate(0deg); }
+                        25% { transform: translateX(-50%) rotate(2deg); }
+                        75% { transform: translateX(-50%) rotate(-2deg); }
+                        100% { transform: translateX(-50%) rotate(0deg); }
+                    }
+                    .hidden {
+                        display: none !important;
                     }
                 </style>
-                <canvas id="fallback-canvas"></canvas>
+                <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" id="font-link">
+                <div id="rgb-title">Rainbow Client</div>
             `;
             shadow.appendChild(container);
-            console.log("Container and styles injected into shadow DOM");
+            console.log("Container, styles, and text injected into shadow DOM");
 
-            // Check if Three.js is available
-            if (typeof THREE === 'undefined') {
-                console.log("Three.js not loaded yet, attempting to initialize");
-                // Bundle Three.js (simplified subset for WebGLRenderer and shaders)
-                // Note: Due to size, we'll simulate loading and proceed with fallback if needed
-                console.warn("Three.js not bundled; attempting WebGL setup");
-            } else {
-                console.log("Three.js already available");
-            }
+            // Monitor font loading
+            const fontLink = container.querySelector('#font-link');
+            fontLink.onload = () => console.log("Font loaded successfully");
+            fontLink.onerror = () => {
+                console.error("Failed to load Google Fonts");
+                const title = container.querySelector('#rgb-title');
+                if (title) title.style.fontFamily = 'monospace';
+                console.log("Fallback to monospace font");
+            };
 
-            try {
-                // Scene setup
-                console.log("Setting up Three.js scene");
-                const scene = new THREE.Scene();
-                const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-                const renderer = new THREE.WebGLRenderer({ antialias: true });
-                renderer.setSize(window.innerWidth, window.innerHeight);
-                renderer.domElement.id = 'rgb-canvas';
-                container.appendChild(renderer.domElement);
-                console.log("Renderer created and canvas appended");
-
-                // Check WebGL availability
-                if (!renderer.getContext()) {
-                    console.error("WebGL is not supported or failed to initialize");
-                    container.innerHTML += '<p style="color: white; text-align: center;">WebGL is not supported in your browser.</p>';
-                    throw new Error("WebGL not supported");
-                }
-                console.log("WebGL context available");
-
-                // Create sphere geometry
-                const geometry = new THREE.SphereGeometry(1, 32, 32);
-                console.log("Sphere geometry created");
-
-                // Custom shader for RGB glow effect
-                const vertexShader = `
-                    varying vec3 vNormal;
-                    varying vec3 vPosition;
-                    void main() {
-                        vNormal = normalize(normalMatrix * normal);
-                        vPosition = (modelViewMatrix * vec4(position, 1.0)).xyz;
-                        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-                    }
-                `;
-
-                const fragmentShader = `
-                    varying vec3 vNormal;
-                    varying vec3 vPosition;
-                    uniform float time;
-                    uniform float glowIntensity;
-                    void main() {
-                        vec3 color = vec3(
-                            sin(vPosition.x + time) * 0.5 + 0.5,
-                            sin(vPosition.y + time + 2.0) * 0.5 + 0.5,
-                            sin(vPosition.z + time + 4.0) * 0.5 + 0.5
-                        );
-                        float intensity = pow(0.6 - dot(vNormal, normalize(-vPosition)), 2.0) * glowIntensity;
-                        gl_FragColor = vec4(color * intensity, 1.0);
-                    }
-                `;
-
+            // Three.js code (subset for brevity, full version should be bundled)
+            // Note: For simplicity, this assumes Three.js is available. In production, bundle the full Three.js code here.
+            // For now, using CDN with fallback to ensure functionality.
+            const threeScript = document.createElement('script');
+            threeScript.src = 'https://cdn.jsdelivr.net/npm/three@0.134.0/build/three.min.js';
+            threeScript.onload = function() {
+                console.log("Three.js loaded successfully");
                 try {
-                    const material = new THREE.ShaderMaterial({
-                        vertexShader: vertexShader,
-                        fragmentShader: fragmentShader,
-                        uniforms: {
-                            time: { value: 0.0 },
-                            glowIntensity: { value: 1.5 }
-                        },
-                        transparent: true,
-                        side: THREE.FrontSide
-                    });
-                    console.log("Shader material created");
+                    // Scene setup
+                    console.log("Setting up Three.js scene");
+                    const scene = new THREE.Scene();
+                    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+                    const renderer = new THREE.WebGLRenderer({ antialias: true });
+                    renderer.setSize(window.innerWidth, window.innerHeight);
+                    renderer.domElement.id = 'rgb-canvas';
+                    container.appendChild(renderer.domElement);
+                    console.log("Renderer created and canvas appended");
+
+                    // Check WebGL availability
+                    if (!renderer.getContext()) {
+                        console.error("WebGL is not supported or failed to initialize");
+                        container.innerHTML += '<p style="color: white; text-align: center;">WebGL is not supported in your browser.</p>';
+                        return;
+                    }
+                    console.log("WebGL context available");
+
+                    // Create sphere geometry
+                    const geometry = new THREE.SphereGeometry(1, 32, 32);
+                    console.log("Sphere geometry created");
+
+                    // Custom shader for RGB glow effect
+                    const vertexShader = `
+                        varying vec3 vNormal;
+                        varying vec3 vPosition;
+                        void main() {
+                            vNormal = normalize(normalMatrix * normal);
+                            vPosition = (modelViewMatrix * vec4(position, 1.0)).xyz;
+                            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                        }
+                    `;
+
+                    const fragmentShader = `
+                        varying vec3 vNormal;
+                        varying vec3 vPosition;
+                        uniform float time;
+                        uniform float glowIntensity;
+                        void main() {
+                            vec3 color = vec3(
+                                sin(vPosition.x + time) * 0.5 + 0.5,
+                                sin(vPosition.y + time + 2.0) * 0.5 + 0.5,
+                                sin(vPosition.z + time + 4.0) * 0.5 + 0.5
+                            );
+                            float intensity = pow(0.6 - dot(vNormal, normalize(-vPosition)), 2.0) * glowIntensity;
+                            gl_FragColor = vec4(color * intensity, 1.0);
+                        }
+                    `;
+
+                    let material;
+                    try {
+                        material = new THREE.ShaderMaterial({
+                            vertexShader: vertexShader,
+                            fragmentShader: fragmentShader,
+                            uniforms: {
+                                time: { value: 0.0 },
+                                glowIntensity: { value: 1.5 }
+                            },
+                            transparent: true,
+                            side: THREE.FrontSide
+                        });
+                        console.log("Shader material created");
+                    } catch (e) {
+                        console.error("Shader creation failed: ", e);
+                        material = new THREE.MeshBasicMaterial({ color: 0xff00ff });
+                        console.log("Fallback to magenta material");
+                    }
+
                     const sphere = new THREE.Mesh(geometry, material);
                     scene.add(sphere);
                     console.log("Sphere added to scene");
-                } catch (e) {
-                    console.error("Shader creation failed: ", e);
-                    const fallbackMaterial = new THREE.MeshBasicMaterial({ color: 0xff00ff });
-                    const sphere = new THREE.Mesh(geometry, fallbackMaterial);
-                    scene.add(sphere);
-                    console.log("Fallback sphere (magenta) added to scene");
-                }
 
-                // Add point light for additional glow
-                const pointLight = new THREE.PointLight(0xffffff, 1.5, 5);
-                pointLight.position.set(0, 0, 0);
-                scene.add(pointLight);
-                console.log("Point light added");
+                    // Add point light for additional glow
+                    const pointLight = new THREE.PointLight(0xffffff, 1.5, 5);
+                    pointLight.position.set(0, 0, 0);
+                    scene.add(pointLight);
+                    console.log("Point light added");
 
-                // Camera position
-                camera.position.z = 3;
-                console.log("Camera positioned");
+                    // Camera position
+                    camera.position.z = 3;
+                    console.log("Camera positioned");
 
-                // Animation loop
-                function animate(t = 0) {
-                    requestAnimationFrame(animate);
-                    if (sphere) sphere.rotation.y += 0.01;
-                    if (material && material.uniforms) {
-                        material.uniforms.time.value = t * 0.001;
+                    // Animation loop
+                    function animate(t = 0) {
+                        requestAnimationFrame(animate);
+                        if (sphere) sphere.rotation.y += 0.01;
+                        if (material && material.uniforms) {
+                            material.uniforms.time.value = t * 0.001;
+                        }
+                        renderer.render(scene, camera);
                     }
-                    renderer.render(scene, camera);
-                }
-                animate();
-                console.log("Animation loop started");
+                    animate();
+                    console.log("Animation loop started");
 
-                // Handle window resize
-                window.addEventListener('resize', () => {
-                    camera.aspect = window.innerWidth / window.innerHeight;
-                    camera.updateProjectionMatrix();
-                    renderer.setSize(window.innerWidth, window.innerHeight);
-                    console.log("Window resized");
-                });
-            } catch (e) {
-                console.error("Three.js scene setup failed: ", e);
-                console.log("Attempting 2D canvas fallback");
-                const fallbackCanvas = container.querySelector('#fallback-canvas');
-                fallbackCanvas.style.display = 'block';
-                fallbackCanvas.width = 200;
-                fallbackCanvas.height = 200;
-                const ctx = fallbackCanvas.getContext('2d');
-                if (ctx) {
-                    console.log("Drawing 2D fallback sphere");
-                    let time = 0;
-                    function drawFallback(t) {
-                        requestAnimationFrame(drawFallback);
-                        ctx.clearRect(0, 0, fallbackCanvas.width, fallbackCanvas.height);
-                        const r = Math.sin(t * 0.001) * 0.5 + 0.5;
-                        const g = Math.sin(t * 0.001 + 2) * 0.5 + 0.5;
-                        const b = Math.sin(t * 0.001 + 4) * 0.5 + 0.5;
-                        ctx.beginPath();
-                        ctx.arc(100, 100, 80, 0, 2 * Math.PI);
-                        ctx.fillStyle = `rgb(${r * 255}, ${g * 255}, ${b * 255})`;
-                        ctx.fill();
-                        time += 16;
-                    }
-                    drawFallback(0);
-                } else {
-                    console.error("2D canvas context not available");
-                    container.innerHTML += '<p style="color: white; text-align: center;">Failed to render sphere.</p>';
-                }
-            }
-        }, 5000); // 5-second delay to avoid Miniblox WebGL conflicts
-    } catch (e) {
-        console.error("Miniblox RGB Sphere Extension: Initialization failed: ", e);
-    }
-})();
+                    // Handle window resize
+                    window.addEventListener('resize', () => {
+                        camera.aspect = window.innerWidth / window.innerHeight;
+                        camera.updateProjectionMatrix();
+                        renderer.setSize(window.innerWidth, window.innerHeight);
+                        console.log("Window resized");
+                    });
+
+                    // Click event to hide everything
+                    const title = container.querySelector('#rgb-title
