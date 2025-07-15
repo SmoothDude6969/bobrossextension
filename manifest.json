@@ -1,8 +1,8 @@
 {
     "manifest_version": 3,
-    "name": "Miniblox RGB Sphere",
-    "version": "1.1",
-    "description": "Injects a black background and RGB glowing sphere into Miniblox.io",
+    "name": "Miniblox RGB Sphere and Text",
+    "version": "1.0",
+    "description": "Injects a black background, RGB glowing sphere, and pixelated Rainbow Client text into Miniblox.io",
     "content_scripts": [
         {
             "matches": ["https://miniblox.io/*"],
