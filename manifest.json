@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Rainbow Sphere Overlay",
-  "version": "1.4",
+  "version": "1.5",
   "description": "Displays a rainbow glowing sphere with text overlay on miniblox.io",
   "permissions": [
     "activeTab",
