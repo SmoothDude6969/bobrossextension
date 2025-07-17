@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Miniblox Cube Overlay",
   "version": "1.0",
-  "description": "Displays a glowing white fast-spinning cube with enhanced glow, text overlay, and whirl transition with white bloom screen on miniblox.io",
+  "description": "Displays a glowing white fast-spinning cube with particles, text overlay, and whirl transition on miniblox.io",
   "permissions": [
     "activeTab",
     "scripting"
@@ -10,7 +10,7 @@
   "content_scripts": [
     {
       "matches": ["https://miniblox.io/*"],
-      "js": ["content.html"],
+      "js": ["content.js"],
       "run_at": "document_end"
     }
   ],
