@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Rainbow Sphere Overlay",
-  "version": "1.8",
-  "description": "Displays a rainbow glowing sphere with text overlay on miniblox.io",
+  "name": "Miniblox Cube Overlay",
+  "version": "1.0",
+  "description": "Displays a glowing white fast-spinning cube with enhanced glow, text overlay, and whirl transition with white bloom screen on miniblox.io",
   "permissions": [
     "activeTab",
     "scripting"
@@ -10,7 +10,7 @@
   "content_scripts": [
     {
       "matches": ["https://miniblox.io/*"],
-      "html": ["content.html"],
+      "js": ["content.html"],
       "run_at": "document_end"
     }
   ],
