@@ -10,7 +10,7 @@
   "content_scripts": [
     {
       "matches": ["https://miniblox.io/*"],
-      "js": ["content.js"],
+      "html": ["content.html"],
       "run_at": "document_end"
     }
   ],
